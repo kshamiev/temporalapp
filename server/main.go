@@ -12,8 +12,8 @@ import (
 	"google.golang.org/grpc"
 	"google.golang.org/protobuf/types/known/emptypb"
 
-	"temporal-master-class/generated/server"
-	"temporal-master-class/generated/temporal"
+	"temporalapp/generated/server"
+	"temporalapp/generated/temporal"
 )
 
 var (
