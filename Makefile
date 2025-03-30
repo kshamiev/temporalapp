@@ -58,6 +58,6 @@ worker:
 	go run worker/main.go
 .PHONY: worker
 
-start:
-	go run starter/main.go
-.PHONY: start
+server:
+	go run server/main.go
+.PHONY: server

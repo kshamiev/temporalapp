@@ -2,8 +2,6 @@ package main
 
 import (
 	"context"
-	"flag"
-	"fmt"
 	"log"
 	"net"
 
@@ -16,9 +14,24 @@ import (
 	"temporalapp/generated/temporal"
 )
 
-var (
-	port = flag.Int("port", 50051, "The server port")
-)
+func main() {
+	// Запускаем простейший GRPC-сервер
+	lis, err := net.Listen("tcp", "localhost:50051")
+	if err != nil {
+		log.Fatalf("failed to listen: %v", err)
+	}
+	c, err := client.Dial(client.Options{})
+	if err != nil {
+		log.Fatalf("failed to create client: %v", err)
+	}
+	tcl := temporal.NewCustomerClient(c)
+	s := grpc.NewServer()
+	server.RegisterCustomerServer(s, &srv{tcl: tcl})
+	log.Printf("server listening at %v", lis.Addr())
+	if err := s.Serve(lis); err != nil {
+		log.Fatalf("failed to serve: %v", err)
+	}
+}
 
 type srv struct {
 	server.CustomerServer
@@ -72,24 +85,4 @@ func (s *srv) Delete(ctx context.Context, in *server.DeleteRequest) (*emptypb.Em
 		return nil, err
 	}
 	return nil, nil
-}
-
-func main() {
-	// Запускаем простейший GRPC-сервер
-	flag.Parse()
-	lis, err := net.Listen("tcp", fmt.Sprintf(":%d", *port))
-	if err != nil {
-		log.Fatalf("failed to listen: %v", err)
-	}
-	c, err := client.Dial(client.Options{})
-	if err != nil {
-		log.Fatalf("failed to create client: %v", err)
-	}
-	tcl := temporal.NewCustomerClient(c)
-	s := grpc.NewServer()
-	server.RegisterCustomerServer(s, &srv{tcl: tcl})
-	log.Printf("server listening at %v", lis.Addr())
-	if err := s.Serve(lis); err != nil {
-		log.Fatalf("failed to serve: %v", err)
-	}
 }
