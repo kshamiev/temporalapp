@@ -55,7 +55,7 @@ temporal-dev-server:
 .PHONY: temporal-dev-server
 
 worker:
-	go run worker/main.go
+	go run worker/main.go worker
 .PHONY: worker
 
 server:
