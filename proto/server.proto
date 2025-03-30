@@ -5,7 +5,7 @@ package server;
 import "google/protobuf/empty.proto";
 import "temporal.proto";
 
-option go_package = "generated/server";
+option go_package = "temporalapp/generated/server";
 
 service Customer {
   rpc Create(temporal.CreateRequest) returns (temporal.Profile) {}

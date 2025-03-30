@@ -2,34 +2,31 @@ package main
 
 import (
 	"log"
+	"os"
 
-	"gitlab.tn.ru/golang/app"
+	"github.com/urfave/cli/v2"
 	"go.temporal.io/sdk/client"
 	"go.temporal.io/sdk/worker"
 
+	"temporalapp/generated/temporal"
 	"temporalapp/listworkflow"
 )
 
 func main() {
-	// The client and worker are heavyweight objects that should be created once per process.
-	c, err := client.Dial(client.Options{})
+	// Инициализируем Worker сразу из кодгена с помощью cli
+	app, err := temporal.NewCustomerCli(
+		temporal.NewCustomerCliOptions().WithWorker(
+			func(cmd *cli.Context, c client.Client) (worker.Worker, error) {
+				w := worker.New(c, temporal.CustomerTaskQueue, worker.Options{})
+				temporal.RegisterCreateWorkflow(w, listworkflow.Register)
+				return w, nil
+			}),
+	)
 	if err != nil {
-		log.Fatalln("Unable to create client", err)
+		log.Fatalf("error initializing example cli: %v", err)
 	}
-	defer c.Close()
 
-	w := worker.New(c, "hello", worker.Options{OnFatalError: func(err error) {
-		log.Fatalf("workflow error: %s", err)
-	}})
-
-	w.RegisterWorkflow(listworkflow.Workflow)
-	w.RegisterActivity(listworkflow.HelloActivity)
-	w.RegisterActivity(listworkflow.ByeActivity)
-
-	// err = w.Run(worker.InterruptCh())
-	err = w.Start()
-	if err != nil {
-		log.Fatalln("Unable to start worker", err)
+	if err := app.Run(os.Args); err != nil {
+		log.Fatal(err)
 	}
-	app.Lock(nil)
 }

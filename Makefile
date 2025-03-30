@@ -27,10 +27,10 @@ dep:
 gen-temporal:
 	protoc \
      -I ./proto \
-     --go_out=./ \
+     --go_out=../ \
      --go_opt=paths=import \
      --plugin=protoc-gen-go-temporal \
-     --go_temporal_out=./ \
+     --go_temporal_out=../ \
      --go_temporal_opt="cli-categories=true" \
      --go_temporal_opt="cli-enabled=true" \
      --go_temporal_opt="workflow-update-enabled=true" \
@@ -40,8 +40,8 @@ gen-temporal:
 gen-server:
 	protoc \
      -I ./proto \
-     --go_out=./ \
-     --go-grpc_out=./ \
+     --go_out=../ \
+     --go-grpc_out=../ \
      --plugin=protoc-gen-go-temporal \
      proto/server.proto
 .PHONY: gen-server
