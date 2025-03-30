@@ -1,0 +1,28 @@
+syntax="proto3";
+
+package server;
+
+import "google/protobuf/empty.proto";
+import "temporal.proto";
+
+option go_package = "temporal-master-class/generated/server";
+
+service Customer {
+  rpc Create(temporal.CreateRequest) returns (temporal.Profile) {}
+  rpc Read(ReadRequest) returns (temporal.Profile) {}
+  rpc Update(UpdateRequest) returns (temporal.Profile) {}
+  rpc Delete(DeleteRequest) returns (google.protobuf.Empty) {}
+}
+
+message ReadRequest {
+  string id = 1;
+}
+
+message UpdateRequest {
+  string id = 1;
+  string name = 2;
+}
+
+message DeleteRequest {
+  string id = 1;
+}
