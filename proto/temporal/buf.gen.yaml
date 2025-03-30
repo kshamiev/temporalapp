@@ -1,0 +1,17 @@
+version: v2
+managed:
+  enabled: true
+  override:
+    - file_option: go_package_prefix
+      value: github.com/cludden/protoc-gen-go-temporal/gen
+plugins:
+  - local: protoc-gen-doc
+    out: ../docs/api
+    opt:
+      - markdown
+      - api.md
+      - source_relative
+  - local: protoc-gen-go
+    out: ../gen
+    opt:
+      - paths=source_relative

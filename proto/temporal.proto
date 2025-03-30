@@ -5,7 +5,7 @@ package temporal;
 import "google/protobuf/empty.proto";
 import "temporal/v1/temporal.proto";
 
-option go_package = "temporal-master-class/generated/temporal";
+option go_package = "generated/temporal";
 
 service Customer {
   // Очередь задач

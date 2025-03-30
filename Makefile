@@ -1,7 +1,6 @@
 # Инициализация
 export DIR := $(realpath .)
 export TEMPORAL_DEBUG=true
-export PROTOC_GEN_GO_TEMPORAL_VERSION=v1.14.3
 
 default: help
 
@@ -28,11 +27,10 @@ dep:
 gen-temporal:
 	protoc \
      -I ./proto \
-     -I ${GOPATH}/pkg/mod/github.com/cludden/protoc-gen-go-temporal@${PROTOC_GEN_GO_TEMPORAL_VERSION}/proto \
-     --go_out=../ \
+     --go_out=generated \
      --go_opt=paths=import \
      --plugin=protoc-gen-go-temporal \
-     --go_temporal_out=../ \
+     --go_temporal_out=generated \
      --go_temporal_opt="cli-categories=true" \
      --go_temporal_opt="cli-enabled=true" \
      --go_temporal_opt="workflow-update-enabled=true" \
@@ -42,7 +40,6 @@ gen-temporal:
 gen-server:
 	protoc \
      -I ./proto \
-     -I ${GOPATH}/pkg/mod/github.com/cludden/protoc-gen-go-temporal@${PROTOC_GEN_GO_TEMPORAL_VERSION}/proto \
      --go_out=../ \
      --go-grpc_out=../ \
      --plugin=protoc-gen-go-temporal \
