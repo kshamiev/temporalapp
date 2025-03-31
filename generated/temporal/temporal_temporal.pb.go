@@ -14,6 +14,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	convert "github.com/cludden/protoc-gen-go-temporal/pkg/convert"
 	expression "github.com/cludden/protoc-gen-go-temporal/pkg/expression"
 	helpers "github.com/cludden/protoc-gen-go-temporal/pkg/helpers"
 	testutil "github.com/cludden/protoc-gen-go-temporal/pkg/testutil"
@@ -40,39 +41,44 @@ const CustomerTaskQueue = "root-v1"
 
 // temporal.Customer workflow names
 const (
-	CreateWorkflowName = "temporal.Customer.Create"
+	CustomerFlowWorkflowName = "temporal.Customer.CustomerFlow"
 )
 
 // temporal.Customer workflow id expressions
 var (
-	CreateIdexpression = expression.MustParseExpression("customers/${! customerId.or(id.or(uuid_v4())) }")
+	CustomerFlowIdexpression = expression.MustParseExpression("customers/${! customerId.or(id.or(uuid_v4())) }")
 )
 
 // temporal.Customer query names
 const (
-	ReadQueryName = "temporal.Customer.Read"
+	GetCartQueryName    = "temporal.Customer.GetCart"
+	GetProfileQueryName = "temporal.Customer.GetProfile"
 )
 
 // temporal.Customer signal names
 const (
-	DeleteSignalName = "temporal.Customer.Delete"
+	DeleteCartSignalName    = "temporal.Customer.DeleteCart"
+	DeleteProfileSignalName = "temporal.Customer.DeleteProfile"
+	SetAddressSignalName    = "temporal.Customer.SetAddress"
 )
 
 // temporal.Customer update names
 const (
-	UpdateUpdateName = "temporal.Customer.Update"
+	CheckoutUpdateName      = "temporal.Customer.Checkout"
+	UpdateCartUpdateName    = "temporal.Customer.UpdateCart"
+	UpdateProfileUpdateName = "temporal.Customer.UpdateProfile"
 )
 
 // CustomerClient describes a client for a(n) temporal.Customer worker
 type CustomerClient interface {
 	// Это основной workflow, представляющий жизненный цикл пользователя
-	Create(ctx context.Context, req *CreateRequest, opts ...*CreateOptions) error
+	CustomerFlow(ctx context.Context, req *CustomerFlowRequest, opts ...*CustomerFlowOptions) error
 
-	// CreateAsync starts a(n) temporal.Customer.Create workflow and returns a handle to the workflow run
-	CreateAsync(ctx context.Context, req *CreateRequest, opts ...*CreateOptions) (CreateRun, error)
+	// CustomerFlowAsync starts a(n) temporal.Customer.CustomerFlow workflow and returns a handle to the workflow run
+	CustomerFlowAsync(ctx context.Context, req *CustomerFlowRequest, opts ...*CustomerFlowOptions) (CustomerFlowRun, error)
 
-	// GetCreate retrieves a handle to an existing temporal.Customer.Create workflow execution
-	GetCreate(ctx context.Context, workflowID string, runID string) CreateRun
+	// GetCustomerFlow retrieves a handle to an existing temporal.Customer.CustomerFlow workflow execution
+	GetCustomerFlow(ctx context.Context, workflowID string, runID string) CustomerFlowRun
 
 	// CancelWorkflow requests cancellation of an existing workflow execution
 	CancelWorkflow(ctx context.Context, workflowID string, runID string) error
@@ -80,23 +86,55 @@ type CustomerClient interface {
 	// TerminateWorkflow an existing workflow execution
 	TerminateWorkflow(ctx context.Context, workflowID string, runID string, reason string, details ...interface{}) error
 
+	// Получение активной корзины пользователя
+	// https://docs.temporal.io/encyclopedia/workflow-message-passing#writing-query-handlers
+	GetCart(ctx context.Context, workflowID string, runID string) (*Cart, error)
+
 	// Получение профиля из запущенного workflow
 	// https://docs.temporal.io/encyclopedia/workflow-message-passing#writing-query-handlers
-	Read(ctx context.Context, workflowID string, runID string) (*Profile, error)
+	GetProfile(ctx context.Context, workflowID string, runID string) (*Profile, error)
+
+	// Удаление корзины юзера
+	// https://docs.temporal.io/encyclopedia/workflow-message-passing#writing-signal-handlers
+	DeleteCart(ctx context.Context, workflowID string, runID string) error
 
 	// Удаление профиля. На самом деле это сигнал, который будет останавливать workflow с признаком отменен.
 	// https://docs.temporal.io/encyclopedia/workflow-message-passing#writing-signal-handlers
-	Delete(ctx context.Context, workflowID string, runID string) error
+	DeleteProfile(ctx context.Context, workflowID string, runID string) error
+
+	// Установка адреса
+	// https://docs.temporal.io/encyclopedia/workflow-message-passing#writing-signal-handlers
+	SetAddress(ctx context.Context, workflowID string, runID string, signal *SetAddressRequest) error
+
+	// Создание заказа через update-handler
+	// https://docs.temporal.io/encyclopedia/workflow-message-passing#writing-query-handlers
+	Checkout(ctx context.Context, workflowID string, runID string, req *CheckoutRequest, opts ...*CheckoutOptions) (*Order, error)
+
+	// CheckoutAsync starts a(n) temporal.Customer.Checkout update and returns a handle to the workflow update
+	CheckoutAsync(ctx context.Context, workflowID string, runID string, req *CheckoutRequest, opts ...*CheckoutOptions) (CheckoutHandle, error)
+
+	// GetCheckout retrieves a handle to an existing temporal.Customer.Checkout update
+	GetCheckout(ctx context.Context, req client.GetWorkflowUpdateHandleOptions) (CheckoutHandle, error)
+
+	// Обновление или создание корзины
+	// https://docs.temporal.io/encyclopedia/workflow-message-passing#writing-query-handlers
+	UpdateCart(ctx context.Context, workflowID string, runID string, req *UpdateCartRequest, opts ...*UpdateCartOptions) (*Cart, error)
+
+	// UpdateCartAsync starts a(n) temporal.Customer.UpdateCart update and returns a handle to the workflow update
+	UpdateCartAsync(ctx context.Context, workflowID string, runID string, req *UpdateCartRequest, opts ...*UpdateCartOptions) (UpdateCartHandle, error)
+
+	// GetUpdateCart retrieves a handle to an existing temporal.Customer.UpdateCart update
+	GetUpdateCart(ctx context.Context, req client.GetWorkflowUpdateHandleOptions) (UpdateCartHandle, error)
 
 	// Обновление профиля в запущенном workflow
 	// https://docs.temporal.io/encyclopedia/workflow-message-passing#writing-query-handlers
-	Update(ctx context.Context, workflowID string, runID string, req *UpdateRequest, opts ...*UpdateOptions) (*Profile, error)
+	UpdateProfile(ctx context.Context, workflowID string, runID string, req *UpdateProfileRequest, opts ...*UpdateProfileOptions) (*Profile, error)
 
-	// UpdateAsync starts a(n) temporal.Customer.Update update and returns a handle to the workflow update
-	UpdateAsync(ctx context.Context, workflowID string, runID string, req *UpdateRequest, opts ...*UpdateOptions) (UpdateHandle, error)
+	// UpdateProfileAsync starts a(n) temporal.Customer.UpdateProfile update and returns a handle to the workflow update
+	UpdateProfileAsync(ctx context.Context, workflowID string, runID string, req *UpdateProfileRequest, opts ...*UpdateProfileOptions) (UpdateProfileHandle, error)
 
-	// GetUpdate retrieves a handle to an existing temporal.Customer.Update update
-	GetUpdate(ctx context.Context, req client.GetWorkflowUpdateHandleOptions) (UpdateHandle, error)
+	// GetUpdateProfile retrieves a handle to an existing temporal.Customer.UpdateProfile update
+	GetUpdateProfile(ctx context.Context, req client.GetWorkflowUpdateHandleOptions) (UpdateProfileHandle, error)
 }
 
 // customerClient implements a temporal client for a temporal.Customer service
@@ -165,8 +203,8 @@ func (opts *customerClientOptions) getLogger() *slog.Logger {
 }
 
 // Это основной workflow, представляющий жизненный цикл пользователя
-func (c *customerClient) Create(ctx context.Context, req *CreateRequest, options ...*CreateOptions) error {
-	run, err := c.CreateAsync(ctx, req, options...)
+func (c *customerClient) CustomerFlow(ctx context.Context, req *CustomerFlowRequest, options ...*CustomerFlowOptions) error {
+	run, err := c.CustomerFlowAsync(ctx, req, options...)
 	if err != nil {
 		return err
 	}
@@ -174,33 +212,33 @@ func (c *customerClient) Create(ctx context.Context, req *CreateRequest, options
 }
 
 // Это основной workflow, представляющий жизненный цикл пользователя
-func (c *customerClient) CreateAsync(ctx context.Context, req *CreateRequest, options ...*CreateOptions) (CreateRun, error) {
-	var o *CreateOptions
+func (c *customerClient) CustomerFlowAsync(ctx context.Context, req *CustomerFlowRequest, options ...*CustomerFlowOptions) (CustomerFlowRun, error) {
+	var o *CustomerFlowOptions
 	if len(options) > 0 && options[0] != nil {
 		o = options[0]
 	} else {
-		o = NewCreateOptions()
+		o = NewCustomerFlowOptions()
 	}
 	opts, err := o.Build(req.ProtoReflect())
 	if err != nil {
 		return nil, fmt.Errorf("error initializing client.StartWorkflowOptions: %w", err)
 	}
-	run, err := c.client.ExecuteWorkflow(ctx, opts, CreateWorkflowName, req)
+	run, err := c.client.ExecuteWorkflow(ctx, opts, CustomerFlowWorkflowName, req)
 	if err != nil {
 		return nil, err
 	}
 	if run == nil {
 		return nil, errors.New("execute workflow returned nil run")
 	}
-	return &createRun{
+	return &customerFlowRun{
 		client: c,
 		run:    run,
 	}, nil
 }
 
-// GetCreate fetches an existing temporal.Customer.Create execution
-func (c *customerClient) GetCreate(ctx context.Context, workflowID string, runID string) CreateRun {
-	return &createRun{
+// GetCustomerFlow fetches an existing temporal.Customer.CustomerFlow execution
+func (c *customerClient) GetCustomerFlow(ctx context.Context, workflowID string, runID string) CustomerFlowRun {
+	return &customerFlowRun{
 		client: c,
 		run:    c.client.GetWorkflow(ctx, workflowID, runID),
 	}
@@ -216,11 +254,11 @@ func (c *customerClient) TerminateWorkflow(ctx context.Context, workflowID strin
 	return c.client.TerminateWorkflow(ctx, workflowID, runID, reason, details...)
 }
 
-// Получение профиля из запущенного workflow
+// Получение активной корзины пользователя
 // https://docs.temporal.io/encyclopedia/workflow-message-passing#writing-query-handlers
-func (c *customerClient) Read(ctx context.Context, workflowID string, runID string) (*Profile, error) {
-	var resp Profile
-	if val, err := c.client.QueryWorkflow(ctx, workflowID, runID, ReadQueryName); err != nil {
+func (c *customerClient) GetCart(ctx context.Context, workflowID string, runID string) (*Cart, error) {
+	var resp Cart
+	if val, err := c.client.QueryWorkflow(ctx, workflowID, runID, GetCartQueryName); err != nil {
 		return nil, err
 	} else if err = val.Get(&resp); err != nil {
 		return nil, err
@@ -228,23 +266,47 @@ func (c *customerClient) Read(ctx context.Context, workflowID string, runID stri
 	return &resp, nil
 }
 
-// Удаление профиля. На самом деле это сигнал, который будет останавливать workflow с признаком отменен.
-// https://docs.temporal.io/encyclopedia/workflow-message-passing#writing-signal-handlers
-func (c *customerClient) Delete(ctx context.Context, workflowID string, runID string) error {
-	return c.client.SignalWorkflow(ctx, workflowID, runID, DeleteSignalName, nil)
+// Получение профиля из запущенного workflow
+// https://docs.temporal.io/encyclopedia/workflow-message-passing#writing-query-handlers
+func (c *customerClient) GetProfile(ctx context.Context, workflowID string, runID string) (*Profile, error) {
+	var resp Profile
+	if val, err := c.client.QueryWorkflow(ctx, workflowID, runID, GetProfileQueryName); err != nil {
+		return nil, err
+	} else if err = val.Get(&resp); err != nil {
+		return nil, err
+	}
+	return &resp, nil
 }
 
-// Обновление профиля в запущенном workflow
+// Удаление корзины юзера
+// https://docs.temporal.io/encyclopedia/workflow-message-passing#writing-signal-handlers
+func (c *customerClient) DeleteCart(ctx context.Context, workflowID string, runID string) error {
+	return c.client.SignalWorkflow(ctx, workflowID, runID, DeleteCartSignalName, nil)
+}
+
+// Удаление профиля. На самом деле это сигнал, который будет останавливать workflow с признаком отменен.
+// https://docs.temporal.io/encyclopedia/workflow-message-passing#writing-signal-handlers
+func (c *customerClient) DeleteProfile(ctx context.Context, workflowID string, runID string) error {
+	return c.client.SignalWorkflow(ctx, workflowID, runID, DeleteProfileSignalName, nil)
+}
+
+// Установка адреса
+// https://docs.temporal.io/encyclopedia/workflow-message-passing#writing-signal-handlers
+func (c *customerClient) SetAddress(ctx context.Context, workflowID string, runID string, signal *SetAddressRequest) error {
+	return c.client.SignalWorkflow(ctx, workflowID, runID, SetAddressSignalName, signal)
+}
+
+// Создание заказа через update-handler
 // https://docs.temporal.io/encyclopedia/workflow-message-passing#writing-query-handlers
-func (c *customerClient) Update(ctx context.Context, workflowID string, runID string, req *UpdateRequest, opts ...*UpdateOptions) (*Profile, error) {
+func (c *customerClient) Checkout(ctx context.Context, workflowID string, runID string, req *CheckoutRequest, opts ...*CheckoutOptions) (*Order, error) {
 	// initialize update options
-	o := NewUpdateOptions()
+	o := NewCheckoutOptions()
 	if len(opts) > 0 && opts[0].Options != nil {
 		o = opts[0]
 	}
 
 	// call sync update with WorkflowUpdateStageCompleted wait policy
-	handle, err := c.UpdateAsync(ctx, workflowID, runID, req, o.WithWaitPolicy(client.WorkflowUpdateStageCompleted))
+	handle, err := c.CheckoutAsync(ctx, workflowID, runID, req, o.WithWaitPolicy(client.WorkflowUpdateStageCompleted))
 	if err != nil {
 		return nil, err
 	}
@@ -253,15 +315,15 @@ func (c *customerClient) Update(ctx context.Context, workflowID string, runID st
 	return handle.Get(ctx)
 }
 
-// Обновление профиля в запущенном workflow
+// Создание заказа через update-handler
 // https://docs.temporal.io/encyclopedia/workflow-message-passing#writing-query-handlers
-func (c *customerClient) UpdateAsync(ctx context.Context, workflowID string, runID string, req *UpdateRequest, opts ...*UpdateOptions) (UpdateHandle, error) {
+func (c *customerClient) CheckoutAsync(ctx context.Context, workflowID string, runID string, req *CheckoutRequest, opts ...*CheckoutOptions) (CheckoutHandle, error) {
 	// initialize update options
-	var o *UpdateOptions
+	var o *CheckoutOptions
 	if len(opts) > 0 && opts[0] != nil {
 		o = opts[0]
 	} else {
-		o = NewUpdateOptions()
+		o = NewCheckoutOptions()
 	}
 
 	// build UpdateWorkflowOptions
@@ -275,19 +337,123 @@ func (c *customerClient) UpdateAsync(ctx context.Context, workflowID string, run
 	if err != nil {
 		return nil, err
 	}
-	return &updateHandle{client: c, handle: handle}, nil
+	return &checkoutHandle{client: c, handle: handle}, nil
 }
 
-// GetUpdate retrieves a handle to an existing temporal.Customer.Update update
-func (c *customerClient) GetUpdate(ctx context.Context, req client.GetWorkflowUpdateHandleOptions) (UpdateHandle, error) {
-	return &updateHandle{
+// GetCheckout retrieves a handle to an existing temporal.Customer.Checkout update
+func (c *customerClient) GetCheckout(ctx context.Context, req client.GetWorkflowUpdateHandleOptions) (CheckoutHandle, error) {
+	return &checkoutHandle{
 		client: c,
 		handle: c.client.GetWorkflowUpdateHandle(req),
 	}, nil
 }
 
-// CreateOptions provides configuration for a temporal.Customer.Create workflow operation
-type CreateOptions struct {
+// Обновление или создание корзины
+// https://docs.temporal.io/encyclopedia/workflow-message-passing#writing-query-handlers
+func (c *customerClient) UpdateCart(ctx context.Context, workflowID string, runID string, req *UpdateCartRequest, opts ...*UpdateCartOptions) (*Cart, error) {
+	// initialize update options
+	o := NewUpdateCartOptions()
+	if len(opts) > 0 && opts[0].Options != nil {
+		o = opts[0]
+	}
+
+	// call sync update with WorkflowUpdateStageCompleted wait policy
+	handle, err := c.UpdateCartAsync(ctx, workflowID, runID, req, o.WithWaitPolicy(client.WorkflowUpdateStageCompleted))
+	if err != nil {
+		return nil, err
+	}
+
+	// block on update completion
+	return handle.Get(ctx)
+}
+
+// Обновление или создание корзины
+// https://docs.temporal.io/encyclopedia/workflow-message-passing#writing-query-handlers
+func (c *customerClient) UpdateCartAsync(ctx context.Context, workflowID string, runID string, req *UpdateCartRequest, opts ...*UpdateCartOptions) (UpdateCartHandle, error) {
+	// initialize update options
+	var o *UpdateCartOptions
+	if len(opts) > 0 && opts[0] != nil {
+		o = opts[0]
+	} else {
+		o = NewUpdateCartOptions()
+	}
+
+	// build UpdateWorkflowOptions
+	options, err := o.Build(workflowID, runID, req)
+	if err != nil {
+		return nil, fmt.Errorf("error initializing UpdateWorkflowWithOptions: %w", err)
+	}
+
+	// update workflow
+	handle, err := c.client.UpdateWorkflow(ctx, *options)
+	if err != nil {
+		return nil, err
+	}
+	return &updateCartHandle{client: c, handle: handle}, nil
+}
+
+// GetUpdateCart retrieves a handle to an existing temporal.Customer.UpdateCart update
+func (c *customerClient) GetUpdateCart(ctx context.Context, req client.GetWorkflowUpdateHandleOptions) (UpdateCartHandle, error) {
+	return &updateCartHandle{
+		client: c,
+		handle: c.client.GetWorkflowUpdateHandle(req),
+	}, nil
+}
+
+// Обновление профиля в запущенном workflow
+// https://docs.temporal.io/encyclopedia/workflow-message-passing#writing-query-handlers
+func (c *customerClient) UpdateProfile(ctx context.Context, workflowID string, runID string, req *UpdateProfileRequest, opts ...*UpdateProfileOptions) (*Profile, error) {
+	// initialize update options
+	o := NewUpdateProfileOptions()
+	if len(opts) > 0 && opts[0].Options != nil {
+		o = opts[0]
+	}
+
+	// call sync update with WorkflowUpdateStageCompleted wait policy
+	handle, err := c.UpdateProfileAsync(ctx, workflowID, runID, req, o.WithWaitPolicy(client.WorkflowUpdateStageCompleted))
+	if err != nil {
+		return nil, err
+	}
+
+	// block on update completion
+	return handle.Get(ctx)
+}
+
+// Обновление профиля в запущенном workflow
+// https://docs.temporal.io/encyclopedia/workflow-message-passing#writing-query-handlers
+func (c *customerClient) UpdateProfileAsync(ctx context.Context, workflowID string, runID string, req *UpdateProfileRequest, opts ...*UpdateProfileOptions) (UpdateProfileHandle, error) {
+	// initialize update options
+	var o *UpdateProfileOptions
+	if len(opts) > 0 && opts[0] != nil {
+		o = opts[0]
+	} else {
+		o = NewUpdateProfileOptions()
+	}
+
+	// build UpdateWorkflowOptions
+	options, err := o.Build(workflowID, runID, req)
+	if err != nil {
+		return nil, fmt.Errorf("error initializing UpdateWorkflowWithOptions: %w", err)
+	}
+
+	// update workflow
+	handle, err := c.client.UpdateWorkflow(ctx, *options)
+	if err != nil {
+		return nil, err
+	}
+	return &updateProfileHandle{client: c, handle: handle}, nil
+}
+
+// GetUpdateProfile retrieves a handle to an existing temporal.Customer.UpdateProfile update
+func (c *customerClient) GetUpdateProfile(ctx context.Context, req client.GetWorkflowUpdateHandleOptions) (UpdateProfileHandle, error) {
+	return &updateProfileHandle{
+		client: c,
+		handle: c.client.GetWorkflowUpdateHandle(req),
+	}, nil
+}
+
+// CustomerFlowOptions provides configuration for a temporal.Customer.CustomerFlow workflow operation
+type CustomerFlowOptions struct {
 	options          client.StartWorkflowOptions
 	executionTimeout *time.Duration
 	id               *string
@@ -299,20 +465,20 @@ type CreateOptions struct {
 	taskTimeout      *time.Duration
 }
 
-// NewCreateOptions initializes a new CreateOptions value
-func NewCreateOptions() *CreateOptions {
-	return &CreateOptions{}
+// NewCustomerFlowOptions initializes a new CustomerFlowOptions value
+func NewCustomerFlowOptions() *CustomerFlowOptions {
+	return &CustomerFlowOptions{}
 }
 
 // Build initializes a new go.temporal.io/sdk/client.StartWorkflowOptions value with defaults and overrides applied
-func (o *CreateOptions) Build(req protoreflect.Message) (client.StartWorkflowOptions, error) {
+func (o *CustomerFlowOptions) Build(req protoreflect.Message) (client.StartWorkflowOptions, error) {
 	opts := o.options
 	if v := o.id; v != nil {
 		opts.ID = *v
 	} else if opts.ID == "" {
-		id, err := expression.EvalExpression(CreateIdexpression, req)
+		id, err := expression.EvalExpression(CustomerFlowIdexpression, req)
 		if err != nil {
-			return opts, fmt.Errorf("error evaluating id expression for %q workflow: %w", CreateWorkflowName, err)
+			return opts, fmt.Errorf("error evaluating id expression for %q workflow: %w", CustomerFlowWorkflowName, err)
 		}
 		opts.ID = id
 	}
@@ -345,61 +511,61 @@ func (o *CreateOptions) Build(req protoreflect.Message) (client.StartWorkflowOpt
 }
 
 // WithStartWorkflowOptions sets the initial go.temporal.io/sdk/client.StartWorkflowOptions
-func (o *CreateOptions) WithStartWorkflowOptions(options client.StartWorkflowOptions) *CreateOptions {
+func (o *CustomerFlowOptions) WithStartWorkflowOptions(options client.StartWorkflowOptions) *CustomerFlowOptions {
 	o.options = options
 	return o
 }
 
 // WithExecutionTimeout sets the WorkflowExecutionTimeout value
-func (o *CreateOptions) WithExecutionTimeout(d time.Duration) *CreateOptions {
+func (o *CustomerFlowOptions) WithExecutionTimeout(d time.Duration) *CustomerFlowOptions {
 	o.executionTimeout = &d
 	return o
 }
 
 // WithID sets the ID value
-func (o *CreateOptions) WithID(id string) *CreateOptions {
+func (o *CustomerFlowOptions) WithID(id string) *CustomerFlowOptions {
 	o.id = &id
 	return o
 }
 
 // WithIDReusePolicy sets the WorkflowIDReusePolicy value
-func (o *CreateOptions) WithIDReusePolicy(policy enumsv1.WorkflowIdReusePolicy) *CreateOptions {
+func (o *CustomerFlowOptions) WithIDReusePolicy(policy enumsv1.WorkflowIdReusePolicy) *CustomerFlowOptions {
 	o.idReusePolicy = policy
 	return o
 }
 
 // WithRetryPolicy sets the RetryPolicy value
-func (o *CreateOptions) WithRetryPolicy(policy *temporal.RetryPolicy) *CreateOptions {
+func (o *CustomerFlowOptions) WithRetryPolicy(policy *temporal.RetryPolicy) *CustomerFlowOptions {
 	o.retryPolicy = policy
 	return o
 }
 
 // WithRunTimeout sets the WorkflowRunTimeout value
-func (o *CreateOptions) WithRunTimeout(d time.Duration) *CreateOptions {
+func (o *CustomerFlowOptions) WithRunTimeout(d time.Duration) *CustomerFlowOptions {
 	o.runTimeout = &d
 	return o
 }
 
 // WithSearchAttributes sets the SearchAttributes value
-func (o *CreateOptions) WithSearchAttributes(sa map[string]any) *CreateOptions {
+func (o *CustomerFlowOptions) WithSearchAttributes(sa map[string]any) *CustomerFlowOptions {
 	o.searchAttributes = sa
 	return o
 }
 
 // WithTaskTimeout sets the WorkflowTaskTimeout value
-func (o *CreateOptions) WithTaskTimeout(d time.Duration) *CreateOptions {
+func (o *CustomerFlowOptions) WithTaskTimeout(d time.Duration) *CustomerFlowOptions {
 	o.taskTimeout = &d
 	return o
 }
 
 // WithTaskQueue sets the TaskQueue value
-func (o *CreateOptions) WithTaskQueue(tq string) *CreateOptions {
+func (o *CustomerFlowOptions) WithTaskQueue(tq string) *CustomerFlowOptions {
 	o.taskQueue = &tq
 	return o
 }
 
-// CreateRun describes a(n) temporal.Customer.Create workflow run
-type CreateRun interface {
+// CustomerFlowRun describes a(n) temporal.Customer.CustomerFlow workflow run
+type CustomerFlowRun interface {
 	// ID returns the workflow ID
 	ID() string
 
@@ -420,83 +586,397 @@ type CreateRun interface {
 
 	// Получение профиля из запущенного workflow
 	// https://docs.temporal.io/encyclopedia/workflow-message-passing#writing-query-handlers
-	Read(ctx context.Context) (*Profile, error)
+	GetProfile(ctx context.Context) (*Profile, error)
+
+	// Получение активной корзины пользователя
+	// https://docs.temporal.io/encyclopedia/workflow-message-passing#writing-query-handlers
+	GetCart(ctx context.Context) (*Cart, error)
 
 	// Удаление профиля. На самом деле это сигнал, который будет останавливать workflow с признаком отменен.
 	// https://docs.temporal.io/encyclopedia/workflow-message-passing#writing-signal-handlers
-	Delete(ctx context.Context) error
+	DeleteProfile(ctx context.Context) error
+
+	// Установка адреса
+	// https://docs.temporal.io/encyclopedia/workflow-message-passing#writing-signal-handlers
+	SetAddress(ctx context.Context, req *SetAddressRequest) error
+
+	// Удаление корзины юзера
+	// https://docs.temporal.io/encyclopedia/workflow-message-passing#writing-signal-handlers
+	DeleteCart(ctx context.Context) error
 
 	// Обновление профиля в запущенном workflow
 	// https://docs.temporal.io/encyclopedia/workflow-message-passing#writing-query-handlers
-	Update(ctx context.Context, req *UpdateRequest, opts ...*UpdateOptions) (*Profile, error)
+	UpdateProfile(ctx context.Context, req *UpdateProfileRequest, opts ...*UpdateProfileOptions) (*Profile, error)
 
 	// Обновление профиля в запущенном workflow
 	// https://docs.temporal.io/encyclopedia/workflow-message-passing#writing-query-handlers
-	UpdateAsync(ctx context.Context, req *UpdateRequest, opts ...*UpdateOptions) (UpdateHandle, error)
+	UpdateProfileAsync(ctx context.Context, req *UpdateProfileRequest, opts ...*UpdateProfileOptions) (UpdateProfileHandle, error)
+
+	// Обновление или создание корзины
+	// https://docs.temporal.io/encyclopedia/workflow-message-passing#writing-query-handlers
+	UpdateCart(ctx context.Context, req *UpdateCartRequest, opts ...*UpdateCartOptions) (*Cart, error)
+
+	// Обновление или создание корзины
+	// https://docs.temporal.io/encyclopedia/workflow-message-passing#writing-query-handlers
+	UpdateCartAsync(ctx context.Context, req *UpdateCartRequest, opts ...*UpdateCartOptions) (UpdateCartHandle, error)
+
+	// Создание заказа через update-handler
+	// https://docs.temporal.io/encyclopedia/workflow-message-passing#writing-query-handlers
+	Checkout(ctx context.Context, req *CheckoutRequest, opts ...*CheckoutOptions) (*Order, error)
+
+	// Создание заказа через update-handler
+	// https://docs.temporal.io/encyclopedia/workflow-message-passing#writing-query-handlers
+	CheckoutAsync(ctx context.Context, req *CheckoutRequest, opts ...*CheckoutOptions) (CheckoutHandle, error)
 }
 
-// createRun provides an internal implementation of a(n) CreateRunRun
-type createRun struct {
+// customerFlowRun provides an internal implementation of a(n) CustomerFlowRunRun
+type customerFlowRun struct {
 	client *customerClient
 	run    client.WorkflowRun
 }
 
 // ID returns the workflow ID
-func (r *createRun) ID() string {
+func (r *customerFlowRun) ID() string {
 	return r.run.GetID()
 }
 
 // Run returns the inner client.WorkflowRun
-func (r *createRun) Run() client.WorkflowRun {
+func (r *customerFlowRun) Run() client.WorkflowRun {
 	return r.run
 }
 
 // RunID returns the execution ID
-func (r *createRun) RunID() string {
+func (r *customerFlowRun) RunID() string {
 	return r.run.GetRunID()
 }
 
 // Cancel requests cancellation of a workflow in execution, returning an error if applicable
-func (r *createRun) Cancel(ctx context.Context) error {
+func (r *customerFlowRun) Cancel(ctx context.Context) error {
 	return r.client.CancelWorkflow(ctx, r.ID(), r.RunID())
 }
 
 // Get blocks until the workflow is complete, returning the result if applicable
-func (r *createRun) Get(ctx context.Context) error {
+func (r *customerFlowRun) Get(ctx context.Context) error {
 	return r.run.Get(ctx, nil)
 }
 
 // Terminate terminates a workflow in execution, returning an error if applicable
-func (r *createRun) Terminate(ctx context.Context, reason string, details ...interface{}) error {
+func (r *customerFlowRun) Terminate(ctx context.Context, reason string, details ...interface{}) error {
 	return r.client.TerminateWorkflow(ctx, r.ID(), r.RunID(), reason, details...)
 }
 
 // Получение профиля из запущенного workflow
 // https://docs.temporal.io/encyclopedia/workflow-message-passing#writing-query-handlers
-func (r *createRun) Read(ctx context.Context) (*Profile, error) {
-	return r.client.Read(ctx, r.ID(), "")
+func (r *customerFlowRun) GetProfile(ctx context.Context) (*Profile, error) {
+	return r.client.GetProfile(ctx, r.ID(), "")
+}
+
+// Получение активной корзины пользователя
+// https://docs.temporal.io/encyclopedia/workflow-message-passing#writing-query-handlers
+func (r *customerFlowRun) GetCart(ctx context.Context) (*Cart, error) {
+	return r.client.GetCart(ctx, r.ID(), "")
 }
 
 // Удаление профиля. На самом деле это сигнал, который будет останавливать workflow с признаком отменен.
 // https://docs.temporal.io/encyclopedia/workflow-message-passing#writing-signal-handlers
-func (r *createRun) Delete(ctx context.Context) error {
-	return r.client.Delete(ctx, r.ID(), "")
+func (r *customerFlowRun) DeleteProfile(ctx context.Context) error {
+	return r.client.DeleteProfile(ctx, r.ID(), "")
+}
+
+// Установка адреса
+// https://docs.temporal.io/encyclopedia/workflow-message-passing#writing-signal-handlers
+func (r *customerFlowRun) SetAddress(ctx context.Context, req *SetAddressRequest) error {
+	return r.client.SetAddress(ctx, r.ID(), "", req)
+}
+
+// Удаление корзины юзера
+// https://docs.temporal.io/encyclopedia/workflow-message-passing#writing-signal-handlers
+func (r *customerFlowRun) DeleteCart(ctx context.Context) error {
+	return r.client.DeleteCart(ctx, r.ID(), "")
 }
 
 // Обновление профиля в запущенном workflow
 // https://docs.temporal.io/encyclopedia/workflow-message-passing#writing-query-handlers
-func (r *createRun) Update(ctx context.Context, req *UpdateRequest, opts ...*UpdateOptions) (*Profile, error) {
-	return r.client.Update(ctx, r.ID(), r.RunID(), req, opts...)
+func (r *customerFlowRun) UpdateProfile(ctx context.Context, req *UpdateProfileRequest, opts ...*UpdateProfileOptions) (*Profile, error) {
+	return r.client.UpdateProfile(ctx, r.ID(), r.RunID(), req, opts...)
 }
 
 // Обновление профиля в запущенном workflow
 // https://docs.temporal.io/encyclopedia/workflow-message-passing#writing-query-handlers
-func (r *createRun) UpdateAsync(ctx context.Context, req *UpdateRequest, opts ...*UpdateOptions) (UpdateHandle, error) {
-	return r.client.UpdateAsync(ctx, r.ID(), r.RunID(), req, opts...)
+func (r *customerFlowRun) UpdateProfileAsync(ctx context.Context, req *UpdateProfileRequest, opts ...*UpdateProfileOptions) (UpdateProfileHandle, error) {
+	return r.client.UpdateProfileAsync(ctx, r.ID(), r.RunID(), req, opts...)
 }
 
-// UpdateHandle describes a(n) temporal.Customer.Update update handle
-type UpdateHandle interface {
+// Обновление или создание корзины
+// https://docs.temporal.io/encyclopedia/workflow-message-passing#writing-query-handlers
+func (r *customerFlowRun) UpdateCart(ctx context.Context, req *UpdateCartRequest, opts ...*UpdateCartOptions) (*Cart, error) {
+	return r.client.UpdateCart(ctx, r.ID(), r.RunID(), req, opts...)
+}
+
+// Обновление или создание корзины
+// https://docs.temporal.io/encyclopedia/workflow-message-passing#writing-query-handlers
+func (r *customerFlowRun) UpdateCartAsync(ctx context.Context, req *UpdateCartRequest, opts ...*UpdateCartOptions) (UpdateCartHandle, error) {
+	return r.client.UpdateCartAsync(ctx, r.ID(), r.RunID(), req, opts...)
+}
+
+// Создание заказа через update-handler
+// https://docs.temporal.io/encyclopedia/workflow-message-passing#writing-query-handlers
+func (r *customerFlowRun) Checkout(ctx context.Context, req *CheckoutRequest, opts ...*CheckoutOptions) (*Order, error) {
+	return r.client.Checkout(ctx, r.ID(), r.RunID(), req, opts...)
+}
+
+// Создание заказа через update-handler
+// https://docs.temporal.io/encyclopedia/workflow-message-passing#writing-query-handlers
+func (r *customerFlowRun) CheckoutAsync(ctx context.Context, req *CheckoutRequest, opts ...*CheckoutOptions) (CheckoutHandle, error) {
+	return r.client.CheckoutAsync(ctx, r.ID(), r.RunID(), req, opts...)
+}
+
+// CheckoutHandle describes a(n) temporal.Customer.Checkout update handle
+type CheckoutHandle interface {
+	// WorkflowID returns the workflow ID
+	WorkflowID() string
+	// RunID returns the workflow instance ID
+	RunID() string
+	// UpdateID returns the update ID
+	UpdateID() string
+	// Get blocks until the workflow is complete and returns the result
+	Get(ctx context.Context) (*Order, error)
+}
+
+// checkoutHandle provides an internal implementation of a(n) CheckoutHandle
+type checkoutHandle struct {
+	client *customerClient
+	handle client.WorkflowUpdateHandle
+}
+
+// WorkflowID returns the workflow ID
+func (h *checkoutHandle) WorkflowID() string {
+	return h.handle.WorkflowID()
+}
+
+// RunID returns the execution ID
+func (h *checkoutHandle) RunID() string {
+	return h.handle.RunID()
+}
+
+// UpdateID returns the update ID
+func (h *checkoutHandle) UpdateID() string {
+	return h.handle.UpdateID()
+}
+
+// Get blocks until the update wait policy is met, returning the result if applicable
+func (h *checkoutHandle) Get(ctx context.Context) (*Order, error) {
+	var resp Order
+	var err error
+	doneCh := make(chan struct{})
+	gctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+
+	go func() {
+		for {
+			var deadlineExceeded *serviceerror.DeadlineExceeded
+			if err = h.handle.Get(gctx, &resp); err != nil && ctx.Err() == nil && (errors.As(err, &deadlineExceeded) || strings.Contains(err.Error(), context.DeadlineExceeded.Error())) {
+				continue
+			}
+			break
+		}
+		close(doneCh)
+	}()
+
+	select {
+	case <-ctx.Done():
+		return nil, ctx.Err()
+	case <-doneCh:
+		if err != nil {
+			return nil, err
+		}
+		return &resp, nil
+	}
+}
+
+// CheckoutOptions provides configuration for a temporal.Customer.Checkout update operation
+type CheckoutOptions struct {
+	Options    *client.UpdateWorkflowOptions
+	id         *string
+	waitPolicy client.WorkflowUpdateStage
+}
+
+// NewCheckoutOptions initializes a new CheckoutOptions value
+func NewCheckoutOptions() *CheckoutOptions {
+	return &CheckoutOptions{Options: &client.UpdateWorkflowOptions{}}
+}
+
+// Build initializes a new client.UpdateWorkflowOptions with defaults and overrides applied
+func (o *CheckoutOptions) Build(workflowID string, runID string, req *CheckoutRequest) (opts *client.UpdateWorkflowOptions, err error) {
+	// use user-provided UpdateWorkflowOptions if exists
+	if o.Options != nil {
+		opts = o.Options
+	} else {
+		opts = &client.UpdateWorkflowOptions{}
+	}
+
+	// set constants
+	opts.Args = []any{req}
+	opts.RunID = runID
+	opts.UpdateName = CheckoutUpdateName
+	opts.WorkflowID = workflowID
+
+	// set UpdateID
+	if v := o.id; v != nil {
+		opts.UpdateID = *v
+	}
+
+	// set WaitPolicy
+	if v := o.waitPolicy; v != client.WorkflowUpdateStageUnspecified {
+		opts.WaitForStage = v
+	} else if opts.WaitForStage == client.WorkflowUpdateStageUnspecified {
+		opts.WaitForStage = client.WorkflowUpdateStageCompleted
+	}
+	return opts, nil
+}
+
+// WithUpdateID sets the UpdateID
+func (o *CheckoutOptions) WithUpdateID(id string) *CheckoutOptions {
+	o.id = &id
+	return o
+}
+
+// WithUpdateWorkflowOptions sets the initial client.UpdateWorkflowOptions
+func (o *CheckoutOptions) WithUpdateWorkflowOptions(options client.UpdateWorkflowOptions) *CheckoutOptions {
+	o.Options = &options
+	return o
+}
+
+// WithWaitPolicy sets the WaitPolicy
+func (o *CheckoutOptions) WithWaitPolicy(policy client.WorkflowUpdateStage) *CheckoutOptions {
+	o.waitPolicy = policy
+	return o
+}
+
+// UpdateCartHandle describes a(n) temporal.Customer.UpdateCart update handle
+type UpdateCartHandle interface {
+	// WorkflowID returns the workflow ID
+	WorkflowID() string
+	// RunID returns the workflow instance ID
+	RunID() string
+	// UpdateID returns the update ID
+	UpdateID() string
+	// Get blocks until the workflow is complete and returns the result
+	Get(ctx context.Context) (*Cart, error)
+}
+
+// updateCartHandle provides an internal implementation of a(n) UpdateCartHandle
+type updateCartHandle struct {
+	client *customerClient
+	handle client.WorkflowUpdateHandle
+}
+
+// WorkflowID returns the workflow ID
+func (h *updateCartHandle) WorkflowID() string {
+	return h.handle.WorkflowID()
+}
+
+// RunID returns the execution ID
+func (h *updateCartHandle) RunID() string {
+	return h.handle.RunID()
+}
+
+// UpdateID returns the update ID
+func (h *updateCartHandle) UpdateID() string {
+	return h.handle.UpdateID()
+}
+
+// Get blocks until the update wait policy is met, returning the result if applicable
+func (h *updateCartHandle) Get(ctx context.Context) (*Cart, error) {
+	var resp Cart
+	var err error
+	doneCh := make(chan struct{})
+	gctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+
+	go func() {
+		for {
+			var deadlineExceeded *serviceerror.DeadlineExceeded
+			if err = h.handle.Get(gctx, &resp); err != nil && ctx.Err() == nil && (errors.As(err, &deadlineExceeded) || strings.Contains(err.Error(), context.DeadlineExceeded.Error())) {
+				continue
+			}
+			break
+		}
+		close(doneCh)
+	}()
+
+	select {
+	case <-ctx.Done():
+		return nil, ctx.Err()
+	case <-doneCh:
+		if err != nil {
+			return nil, err
+		}
+		return &resp, nil
+	}
+}
+
+// UpdateCartOptions provides configuration for a temporal.Customer.UpdateCart update operation
+type UpdateCartOptions struct {
+	Options    *client.UpdateWorkflowOptions
+	id         *string
+	waitPolicy client.WorkflowUpdateStage
+}
+
+// NewUpdateCartOptions initializes a new UpdateCartOptions value
+func NewUpdateCartOptions() *UpdateCartOptions {
+	return &UpdateCartOptions{Options: &client.UpdateWorkflowOptions{}}
+}
+
+// Build initializes a new client.UpdateWorkflowOptions with defaults and overrides applied
+func (o *UpdateCartOptions) Build(workflowID string, runID string, req *UpdateCartRequest) (opts *client.UpdateWorkflowOptions, err error) {
+	// use user-provided UpdateWorkflowOptions if exists
+	if o.Options != nil {
+		opts = o.Options
+	} else {
+		opts = &client.UpdateWorkflowOptions{}
+	}
+
+	// set constants
+	opts.Args = []any{req}
+	opts.RunID = runID
+	opts.UpdateName = UpdateCartUpdateName
+	opts.WorkflowID = workflowID
+
+	// set UpdateID
+	if v := o.id; v != nil {
+		opts.UpdateID = *v
+	}
+
+	// set WaitPolicy
+	if v := o.waitPolicy; v != client.WorkflowUpdateStageUnspecified {
+		opts.WaitForStage = v
+	} else if opts.WaitForStage == client.WorkflowUpdateStageUnspecified {
+		opts.WaitForStage = client.WorkflowUpdateStageCompleted
+	}
+	return opts, nil
+}
+
+// WithUpdateID sets the UpdateID
+func (o *UpdateCartOptions) WithUpdateID(id string) *UpdateCartOptions {
+	o.id = &id
+	return o
+}
+
+// WithUpdateWorkflowOptions sets the initial client.UpdateWorkflowOptions
+func (o *UpdateCartOptions) WithUpdateWorkflowOptions(options client.UpdateWorkflowOptions) *UpdateCartOptions {
+	o.Options = &options
+	return o
+}
+
+// WithWaitPolicy sets the WaitPolicy
+func (o *UpdateCartOptions) WithWaitPolicy(policy client.WorkflowUpdateStage) *UpdateCartOptions {
+	o.waitPolicy = policy
+	return o
+}
+
+// UpdateProfileHandle describes a(n) temporal.Customer.UpdateProfile update handle
+type UpdateProfileHandle interface {
 	// WorkflowID returns the workflow ID
 	WorkflowID() string
 	// RunID returns the workflow instance ID
@@ -507,29 +987,29 @@ type UpdateHandle interface {
 	Get(ctx context.Context) (*Profile, error)
 }
 
-// updateHandle provides an internal implementation of a(n) UpdateHandle
-type updateHandle struct {
+// updateProfileHandle provides an internal implementation of a(n) UpdateProfileHandle
+type updateProfileHandle struct {
 	client *customerClient
 	handle client.WorkflowUpdateHandle
 }
 
 // WorkflowID returns the workflow ID
-func (h *updateHandle) WorkflowID() string {
+func (h *updateProfileHandle) WorkflowID() string {
 	return h.handle.WorkflowID()
 }
 
 // RunID returns the execution ID
-func (h *updateHandle) RunID() string {
+func (h *updateProfileHandle) RunID() string {
 	return h.handle.RunID()
 }
 
 // UpdateID returns the update ID
-func (h *updateHandle) UpdateID() string {
+func (h *updateProfileHandle) UpdateID() string {
 	return h.handle.UpdateID()
 }
 
 // Get blocks until the update wait policy is met, returning the result if applicable
-func (h *updateHandle) Get(ctx context.Context) (*Profile, error) {
+func (h *updateProfileHandle) Get(ctx context.Context) (*Profile, error) {
 	var resp Profile
 	var err error
 	doneCh := make(chan struct{})
@@ -558,20 +1038,20 @@ func (h *updateHandle) Get(ctx context.Context) (*Profile, error) {
 	}
 }
 
-// UpdateOptions provides configuration for a temporal.Customer.Update update operation
-type UpdateOptions struct {
+// UpdateProfileOptions provides configuration for a temporal.Customer.UpdateProfile update operation
+type UpdateProfileOptions struct {
 	Options    *client.UpdateWorkflowOptions
 	id         *string
 	waitPolicy client.WorkflowUpdateStage
 }
 
-// NewUpdateOptions initializes a new UpdateOptions value
-func NewUpdateOptions() *UpdateOptions {
-	return &UpdateOptions{Options: &client.UpdateWorkflowOptions{}}
+// NewUpdateProfileOptions initializes a new UpdateProfileOptions value
+func NewUpdateProfileOptions() *UpdateProfileOptions {
+	return &UpdateProfileOptions{Options: &client.UpdateWorkflowOptions{}}
 }
 
 // Build initializes a new client.UpdateWorkflowOptions with defaults and overrides applied
-func (o *UpdateOptions) Build(workflowID string, runID string, req *UpdateRequest) (opts *client.UpdateWorkflowOptions, err error) {
+func (o *UpdateProfileOptions) Build(workflowID string, runID string, req *UpdateProfileRequest) (opts *client.UpdateWorkflowOptions, err error) {
 	// use user-provided UpdateWorkflowOptions if exists
 	if o.Options != nil {
 		opts = o.Options
@@ -582,7 +1062,7 @@ func (o *UpdateOptions) Build(workflowID string, runID string, req *UpdateReques
 	// set constants
 	opts.Args = []any{req}
 	opts.RunID = runID
-	opts.UpdateName = UpdateUpdateName
+	opts.UpdateName = UpdateProfileUpdateName
 	opts.WorkflowID = workflowID
 
 	// set UpdateID
@@ -600,19 +1080,19 @@ func (o *UpdateOptions) Build(workflowID string, runID string, req *UpdateReques
 }
 
 // WithUpdateID sets the UpdateID
-func (o *UpdateOptions) WithUpdateID(id string) *UpdateOptions {
+func (o *UpdateProfileOptions) WithUpdateID(id string) *UpdateProfileOptions {
 	o.id = &id
 	return o
 }
 
 // WithUpdateWorkflowOptions sets the initial client.UpdateWorkflowOptions
-func (o *UpdateOptions) WithUpdateWorkflowOptions(options client.UpdateWorkflowOptions) *UpdateOptions {
+func (o *UpdateProfileOptions) WithUpdateWorkflowOptions(options client.UpdateWorkflowOptions) *UpdateProfileOptions {
 	o.Options = &options
 	return o
 }
 
 // WithWaitPolicy sets the WaitPolicy
-func (o *UpdateOptions) WithWaitPolicy(policy client.WorkflowUpdateStage) *UpdateOptions {
+func (o *UpdateProfileOptions) WithWaitPolicy(policy client.WorkflowUpdateStage) *UpdateProfileOptions {
 	o.waitPolicy = policy
 	return o
 }
@@ -620,7 +1100,7 @@ func (o *UpdateOptions) WithWaitPolicy(policy client.WorkflowUpdateStage) *Updat
 // Reference to generated workflow functions
 var (
 	// Это основной workflow, представляющий жизненный цикл пользователя
-	CreateFunction func(workflow.Context, *CreateRequest) error
+	CustomerFlowFunction func(workflow.Context, *CustomerFlowRequest) error
 )
 
 // CustomerWorkflowFunctions describes a mockable dependency for inlining workflows within other workflows
@@ -628,7 +1108,7 @@ type (
 	// CustomerWorkflowFunctions describes a mockable dependency for inlining workflows within other workflows
 	CustomerWorkflowFunctions interface {
 		// Это основной workflow, представляющий жизненный цикл пользователя
-		Create(workflow.Context, *CreateRequest) error
+		CustomerFlow(workflow.Context, *CustomerFlowRequest) error
 	}
 	// customerWorkflowFunctions provides an internal CustomerWorkflowFunctions implementation
 	customerWorkflowFunctions struct{}
@@ -639,37 +1119,43 @@ func NewCustomerWorkflowFunctions() CustomerWorkflowFunctions {
 }
 
 // Это основной workflow, представляющий жизненный цикл пользователя
-func (f *customerWorkflowFunctions) Create(ctx workflow.Context, req *CreateRequest) error {
-	if CreateFunction == nil {
-		return errors.New("Create requires workflow registration via RegisterCustomerWorkflows or RegisterCreateWorkflow")
+func (f *customerWorkflowFunctions) CustomerFlow(ctx workflow.Context, req *CustomerFlowRequest) error {
+	if CustomerFlowFunction == nil {
+		return errors.New("CustomerFlow requires workflow registration via RegisterCustomerWorkflows or RegisterCustomerFlowWorkflow")
 	}
-	return CreateFunction(ctx, req)
+	return CustomerFlowFunction(ctx, req)
 }
 
 // CustomerWorkflows provides methods for initializing new temporal.Customer workflow values
 type CustomerWorkflows interface {
 	// Это основной workflow, представляющий жизненный цикл пользователя
-	Create(ctx workflow.Context, input *CreateWorkflowInput) (CreateWorkflow, error)
+	CustomerFlow(ctx workflow.Context, input *CustomerFlowWorkflowInput) (CustomerFlowWorkflow, error)
 }
 
 // RegisterCustomerWorkflows registers temporal.Customer workflows with the given worker
 func RegisterCustomerWorkflows(r worker.WorkflowRegistry, workflows CustomerWorkflows) {
-	RegisterCreateWorkflow(r, workflows.Create)
+	RegisterCustomerFlowWorkflow(r, workflows.CustomerFlow)
 }
 
-// RegisterCreateWorkflow registers a temporal.Customer.Create workflow with the given worker
-func RegisterCreateWorkflow(r worker.WorkflowRegistry, wf func(workflow.Context, *CreateWorkflowInput) (CreateWorkflow, error)) {
-	CreateFunction = buildCreate(wf)
-	r.RegisterWorkflowWithOptions(CreateFunction, workflow.RegisterOptions{Name: CreateWorkflowName})
+// RegisterCustomerFlowWorkflow registers a temporal.Customer.CustomerFlow workflow with the given worker
+func RegisterCustomerFlowWorkflow(r worker.WorkflowRegistry, wf func(workflow.Context, *CustomerFlowWorkflowInput) (CustomerFlowWorkflow, error)) {
+	CustomerFlowFunction = buildCustomerFlow(wf)
+	r.RegisterWorkflowWithOptions(CustomerFlowFunction, workflow.RegisterOptions{Name: CustomerFlowWorkflowName})
 }
 
-// buildCreate converts a Create workflow struct into a valid workflow function
-func buildCreate(ctor func(workflow.Context, *CreateWorkflowInput) (CreateWorkflow, error)) func(workflow.Context, *CreateRequest) error {
-	return func(ctx workflow.Context, req *CreateRequest) error {
-		input := &CreateWorkflowInput{
+// buildCustomerFlow converts a CustomerFlow workflow struct into a valid workflow function
+func buildCustomerFlow(ctor func(workflow.Context, *CustomerFlowWorkflowInput) (CustomerFlowWorkflow, error)) func(workflow.Context, *CustomerFlowRequest) error {
+	return func(ctx workflow.Context, req *CustomerFlowRequest) error {
+		input := &CustomerFlowWorkflowInput{
 			Req: req,
-			Delete: &DeleteSignal{
-				Channel: workflow.GetSignalChannel(ctx, DeleteSignalName),
+			DeleteProfile: &DeleteProfileSignal{
+				Channel: workflow.GetSignalChannel(ctx, DeleteProfileSignalName),
+			},
+			SetAddress: &SetAddressSignal{
+				Channel: workflow.GetSignalChannel(ctx, SetAddressSignalName),
+			},
+			DeleteCart: &DeleteCartSignal{
+				Channel: workflow.GetSignalChannel(ctx, DeleteCartSignalName),
 			},
 		}
 		wf, err := ctor(ctx, input)
@@ -681,12 +1167,27 @@ func buildCreate(ctor func(workflow.Context, *CreateWorkflowInput) (CreateWorkfl
 				return err
 			}
 		}
-		if err := workflow.SetQueryHandler(ctx, ReadQueryName, wf.Read); err != nil {
+		if err := workflow.SetQueryHandler(ctx, GetProfileQueryName, wf.GetProfile); err != nil {
+			return err
+		}
+		if err := workflow.SetQueryHandler(ctx, GetCartQueryName, wf.GetCart); err != nil {
 			return err
 		}
 		{
 			opts := workflow.UpdateHandlerOptions{}
-			if err := workflow.SetUpdateHandlerWithOptions(ctx, UpdateUpdateName, wf.Update, opts); err != nil {
+			if err := workflow.SetUpdateHandlerWithOptions(ctx, UpdateProfileUpdateName, wf.UpdateProfile, opts); err != nil {
+				return err
+			}
+		}
+		{
+			opts := workflow.UpdateHandlerOptions{}
+			if err := workflow.SetUpdateHandlerWithOptions(ctx, UpdateCartUpdateName, wf.UpdateCart, opts); err != nil {
+				return err
+			}
+		}
+		{
+			opts := workflow.UpdateHandlerOptions{}
+			if err := workflow.SetUpdateHandlerWithOptions(ctx, CheckoutUpdateName, wf.Checkout, opts); err != nil {
 				return err
 			}
 		}
@@ -694,31 +1195,45 @@ func buildCreate(ctor func(workflow.Context, *CreateWorkflowInput) (CreateWorkfl
 	}
 }
 
-// CreateWorkflowInput describes the input to a(n) temporal.Customer.Create workflow constructor
-type CreateWorkflowInput struct {
-	Req    *CreateRequest
-	Delete *DeleteSignal
+// CustomerFlowWorkflowInput describes the input to a(n) temporal.Customer.CustomerFlow workflow constructor
+type CustomerFlowWorkflowInput struct {
+	Req           *CustomerFlowRequest
+	DeleteProfile *DeleteProfileSignal
+	SetAddress    *SetAddressSignal
+	DeleteCart    *DeleteCartSignal
 }
 
 // Это основной workflow, представляющий жизненный цикл пользователя
 //
-// workflow details: (name: "temporal.Customer.Create", id: "customers/${! customerId.or(id.or(uuid_v4())) }")
-type CreateWorkflow interface {
-	// Execute defines the entrypoint to a(n) temporal.Customer.Create workflow
+// workflow details: (name: "temporal.Customer.CustomerFlow", id: "customers/${! customerId.or(id.or(uuid_v4())) }")
+type CustomerFlowWorkflow interface {
+	// Execute defines the entrypoint to a(n) temporal.Customer.CustomerFlow workflow
 	Execute(ctx workflow.Context) error
 
 	// Получение профиля из запущенного workflow
 	// https://docs.temporal.io/encyclopedia/workflow-message-passing#writing-query-handlers
-	Read() (*Profile, error)
+	GetProfile() (*Profile, error)
+
+	// Получение активной корзины пользователя
+	// https://docs.temporal.io/encyclopedia/workflow-message-passing#writing-query-handlers
+	GetCart() (*Cart, error)
 
 	// Обновление профиля в запущенном workflow
 	// https://docs.temporal.io/encyclopedia/workflow-message-passing#writing-query-handlers
-	Update(workflow.Context, *UpdateRequest) (*Profile, error)
+	UpdateProfile(workflow.Context, *UpdateProfileRequest) (*Profile, error)
+
+	// Обновление или создание корзины
+	// https://docs.temporal.io/encyclopedia/workflow-message-passing#writing-query-handlers
+	UpdateCart(workflow.Context, *UpdateCartRequest) (*Cart, error)
+
+	// Создание заказа через update-handler
+	// https://docs.temporal.io/encyclopedia/workflow-message-passing#writing-query-handlers
+	Checkout(workflow.Context, *CheckoutRequest) (*Order, error)
 }
 
 // Это основной workflow, представляющий жизненный цикл пользователя
-func CreateChild(ctx workflow.Context, req *CreateRequest, options ...*CreateChildOptions) error {
-	childRun, err := CreateChildAsync(ctx, req, options...)
+func CustomerFlowChild(ctx workflow.Context, req *CustomerFlowRequest, options ...*CustomerFlowChildOptions) error {
+	childRun, err := CustomerFlowChildAsync(ctx, req, options...)
 	if err != nil {
 		return err
 	}
@@ -726,23 +1241,23 @@ func CreateChild(ctx workflow.Context, req *CreateRequest, options ...*CreateChi
 }
 
 // Это основной workflow, представляющий жизненный цикл пользователя
-func CreateChildAsync(ctx workflow.Context, req *CreateRequest, options ...*CreateChildOptions) (*CreateChildRun, error) {
-	var o *CreateChildOptions
+func CustomerFlowChildAsync(ctx workflow.Context, req *CustomerFlowRequest, options ...*CustomerFlowChildOptions) (*CustomerFlowChildRun, error) {
+	var o *CustomerFlowChildOptions
 	if len(options) > 0 && options[0] != nil {
 		o = options[0]
 	} else {
-		o = NewCreateChildOptions()
+		o = NewCustomerFlowChildOptions()
 	}
 	opts, err := o.Build(ctx, req.ProtoReflect())
 	if err != nil {
 		return nil, fmt.Errorf("error initializing workflow.ChildWorkflowOptions: %w", err)
 	}
 	ctx = workflow.WithChildOptions(ctx, opts)
-	return &CreateChildRun{Future: workflow.ExecuteChildWorkflow(ctx, CreateWorkflowName, req)}, nil
+	return &CustomerFlowChildRun{Future: workflow.ExecuteChildWorkflow(ctx, CustomerFlowWorkflowName, req)}, nil
 }
 
-// CreateChildOptions provides configuration for a child temporal.Customer.Create workflow operation
-type CreateChildOptions struct {
+// CustomerFlowChildOptions provides configuration for a child temporal.Customer.CustomerFlow workflow operation
+type CustomerFlowChildOptions struct {
 	options             workflow.ChildWorkflowOptions
 	executionTimeout    *time.Duration
 	id                  *string
@@ -756,13 +1271,13 @@ type CreateChildOptions struct {
 	waitForCancellation *bool
 }
 
-// NewCreateChildOptions initializes a new CreateChildOptions value
-func NewCreateChildOptions() *CreateChildOptions {
-	return &CreateChildOptions{}
+// NewCustomerFlowChildOptions initializes a new CustomerFlowChildOptions value
+func NewCustomerFlowChildOptions() *CustomerFlowChildOptions {
+	return &CustomerFlowChildOptions{}
 }
 
 // Build initializes a new go.temporal.io/sdk/workflow.ChildWorkflowOptions value with defaults and overrides applied
-func (o *CreateChildOptions) Build(ctx workflow.Context, req protoreflect.Message) (workflow.ChildWorkflowOptions, error) {
+func (o *CustomerFlowChildOptions) Build(ctx workflow.Context, req protoreflect.Message) (workflow.ChildWorkflowOptions, error) {
 	opts := o.options
 	if v := o.id; v != nil {
 		opts.WorkflowID = *v
@@ -773,18 +1288,18 @@ func (o *CreateChildOptions) Build(ctx workflow.Context, req protoreflect.Messag
 			lao := workflow.GetLocalActivityOptions(ctx)
 			lao.ScheduleToCloseTimeout = time.Second * 10
 			if err := workflow.ExecuteLocalActivity(workflow.WithLocalActivityOptions(ctx, lao), func(ctx context.Context) (string, error) {
-				id, err := expression.EvalExpression(CreateIdexpression, req)
+				id, err := expression.EvalExpression(CustomerFlowIdexpression, req)
 				if err != nil {
-					return "", fmt.Errorf("error evaluating id expression for %q workflow: %w", CreateWorkflowName, err)
+					return "", fmt.Errorf("error evaluating id expression for %q workflow: %w", CustomerFlowWorkflowName, err)
 				}
 				return id, nil
 			}).Get(ctx, &opts.WorkflowID); err != nil {
-				return opts, fmt.Errorf("error evaluating id expression for %q workflow: %w", CreateWorkflowName, err)
+				return opts, fmt.Errorf("error evaluating id expression for %q workflow: %w", CustomerFlowWorkflowName, err)
 			}
 		} else {
-			id, err := expression.EvalExpression(CreateIdexpression, req)
+			id, err := expression.EvalExpression(CustomerFlowIdexpression, req)
 			if err != nil {
-				return opts, fmt.Errorf("error evaluating id expression for %q workflow: %w", CreateWorkflowName, err)
+				return opts, fmt.Errorf("error evaluating id expression for %q workflow: %w", CustomerFlowWorkflowName, err)
 			}
 			opts.WorkflowID = id
 		}
@@ -824,78 +1339,78 @@ func (o *CreateChildOptions) Build(ctx workflow.Context, req protoreflect.Messag
 }
 
 // WithChildWorkflowOptions sets the initial go.temporal.io/sdk/workflow.ChildWorkflowOptions
-func (o *CreateChildOptions) WithChildWorkflowOptions(options workflow.ChildWorkflowOptions) *CreateChildOptions {
+func (o *CustomerFlowChildOptions) WithChildWorkflowOptions(options workflow.ChildWorkflowOptions) *CustomerFlowChildOptions {
 	o.options = options
 	return o
 }
 
 // WithExecutionTimeout sets the WorkflowExecutionTimeout value
-func (o *CreateChildOptions) WithExecutionTimeout(d time.Duration) *CreateChildOptions {
+func (o *CustomerFlowChildOptions) WithExecutionTimeout(d time.Duration) *CustomerFlowChildOptions {
 	o.executionTimeout = &d
 	return o
 }
 
 // WithID sets the WorkflowID value
-func (o *CreateChildOptions) WithID(id string) *CreateChildOptions {
+func (o *CustomerFlowChildOptions) WithID(id string) *CustomerFlowChildOptions {
 	o.id = &id
 	return o
 }
 
 // WithIDReusePolicy sets the WorkflowIDReusePolicy value
-func (o *CreateChildOptions) WithIDReusePolicy(policy enumsv1.WorkflowIdReusePolicy) *CreateChildOptions {
+func (o *CustomerFlowChildOptions) WithIDReusePolicy(policy enumsv1.WorkflowIdReusePolicy) *CustomerFlowChildOptions {
 	o.idReusePolicy = policy
 	return o
 }
 
 // WithParentClosePolicy sets the WorkflowIDReusePolicy value
-func (o *CreateChildOptions) WithParentClosePolicy(policy enumsv1.ParentClosePolicy) *CreateChildOptions {
+func (o *CustomerFlowChildOptions) WithParentClosePolicy(policy enumsv1.ParentClosePolicy) *CustomerFlowChildOptions {
 	o.parentClosePolicy = policy
 	return o
 }
 
 // WithRetryPolicy sets the RetryPolicy value
-func (o *CreateChildOptions) WithRetryPolicy(policy *temporal.RetryPolicy) *CreateChildOptions {
+func (o *CustomerFlowChildOptions) WithRetryPolicy(policy *temporal.RetryPolicy) *CustomerFlowChildOptions {
 	o.retryPolicy = policy
 	return o
 }
 
 // WithRunTimeout sets the WorkflowRunTimeout value
-func (o *CreateChildOptions) WithRunTimeout(d time.Duration) *CreateChildOptions {
+func (o *CustomerFlowChildOptions) WithRunTimeout(d time.Duration) *CustomerFlowChildOptions {
 	o.runTimeout = &d
 	return o
 }
 
 // WithSearchAttributes sets the SearchAttributes value
-func (o *CreateChildOptions) WithSearchAttributes(sa map[string]any) *CreateChildOptions {
+func (o *CustomerFlowChildOptions) WithSearchAttributes(sa map[string]any) *CustomerFlowChildOptions {
 	o.searchAttributes = sa
 	return o
 }
 
 // WithTaskTimeout sets the WorkflowTaskTimeout value
-func (o *CreateChildOptions) WithTaskTimeout(d time.Duration) *CreateChildOptions {
+func (o *CustomerFlowChildOptions) WithTaskTimeout(d time.Duration) *CustomerFlowChildOptions {
 	o.taskTimeout = &d
 	return o
 }
 
 // WithTaskQueue sets the TaskQueue value
-func (o *CreateChildOptions) WithTaskQueue(tq string) *CreateChildOptions {
+func (o *CustomerFlowChildOptions) WithTaskQueue(tq string) *CustomerFlowChildOptions {
 	o.taskQueue = &tq
 	return o
 }
 
 // WithWaitForCancellation sets the WaitForCancellation value
-func (o *CreateChildOptions) WithWaitForCancellation(wait bool) *CreateChildOptions {
+func (o *CustomerFlowChildOptions) WithWaitForCancellation(wait bool) *CustomerFlowChildOptions {
 	o.waitForCancellation = &wait
 	return o
 }
 
-// CreateChildRun describes a child Create workflow run
-type CreateChildRun struct {
+// CustomerFlowChildRun describes a child CustomerFlow workflow run
+type CustomerFlowChildRun struct {
 	Future workflow.ChildWorkflowFuture
 }
 
 // Get blocks until the workflow is completed, returning the response value
-func (r *CreateChildRun) Get(ctx workflow.Context) error {
+func (r *CustomerFlowChildRun) Get(ctx workflow.Context) error {
 	if err := r.Future.Get(ctx, nil); err != nil {
 		return err
 	}
@@ -903,7 +1418,7 @@ func (r *CreateChildRun) Get(ctx workflow.Context) error {
 }
 
 // Select adds this completion to the selector. Callback can be nil.
-func (r *CreateChildRun) Select(sel workflow.Selector, fn func(*CreateChildRun)) workflow.Selector {
+func (r *CustomerFlowChildRun) Select(sel workflow.Selector, fn func(*CustomerFlowChildRun)) workflow.Selector {
 	return sel.AddFuture(r.Future, func(workflow.Future) {
 		if fn != nil {
 			fn(r)
@@ -912,7 +1427,7 @@ func (r *CreateChildRun) Select(sel workflow.Selector, fn func(*CreateChildRun))
 }
 
 // SelectStart adds waiting for start to the selector. Callback can be nil.
-func (r *CreateChildRun) SelectStart(sel workflow.Selector, fn func(*CreateChildRun)) workflow.Selector {
+func (r *CustomerFlowChildRun) SelectStart(sel workflow.Selector, fn func(*CustomerFlowChildRun)) workflow.Selector {
 	return sel.AddFuture(r.Future.GetChildWorkflowExecution(), func(workflow.Future) {
 		if fn != nil {
 			fn(r)
@@ -921,7 +1436,7 @@ func (r *CreateChildRun) SelectStart(sel workflow.Selector, fn func(*CreateChild
 }
 
 // WaitStart waits for the child workflow to start
-func (r *CreateChildRun) WaitStart(ctx workflow.Context) (*workflow.Execution, error) {
+func (r *CustomerFlowChildRun) WaitStart(ctx workflow.Context) (*workflow.Execution, error) {
 	var exec workflow.Execution
 	if err := r.Future.GetChildWorkflowExecution().Get(ctx, &exec); err != nil {
 		return nil, err
@@ -929,49 +1444,122 @@ func (r *CreateChildRun) WaitStart(ctx workflow.Context) (*workflow.Execution, e
 	return &exec, nil
 }
 
-// Delete sends a(n) "temporal.Customer.Delete" signal request to the child workflow
-func (r *CreateChildRun) Delete(ctx workflow.Context) error {
-	return r.DeleteAsync(ctx).Get(ctx, nil)
+// DeleteProfile sends a(n) "temporal.Customer.DeleteProfile" signal request to the child workflow
+func (r *CustomerFlowChildRun) DeleteProfile(ctx workflow.Context) error {
+	return r.DeleteProfileAsync(ctx).Get(ctx, nil)
 }
 
-// DeleteAsync sends a(n) "temporal.Customer.Delete" signal request to the child workflow
-func (r *CreateChildRun) DeleteAsync(ctx workflow.Context) workflow.Future {
-	return r.Future.SignalChildWorkflow(ctx, DeleteSignalName, nil)
+// DeleteProfileAsync sends a(n) "temporal.Customer.DeleteProfile" signal request to the child workflow
+func (r *CustomerFlowChildRun) DeleteProfileAsync(ctx workflow.Context) workflow.Future {
+	return r.Future.SignalChildWorkflow(ctx, DeleteProfileSignalName, nil)
 }
 
-// DeleteSignal describes a(n) temporal.Customer.Delete signal
-type DeleteSignal struct {
+// SetAddress sends a(n) "temporal.Customer.SetAddress" signal request to the child workflow
+func (r *CustomerFlowChildRun) SetAddress(ctx workflow.Context, input *SetAddressRequest) error {
+	return r.SetAddressAsync(ctx, input).Get(ctx, nil)
+}
+
+// SetAddressAsync sends a(n) "temporal.Customer.SetAddress" signal request to the child workflow
+func (r *CustomerFlowChildRun) SetAddressAsync(ctx workflow.Context, input *SetAddressRequest) workflow.Future {
+	return r.Future.SignalChildWorkflow(ctx, SetAddressSignalName, input)
+}
+
+// DeleteCart sends a(n) "temporal.Customer.DeleteCart" signal request to the child workflow
+func (r *CustomerFlowChildRun) DeleteCart(ctx workflow.Context) error {
+	return r.DeleteCartAsync(ctx).Get(ctx, nil)
+}
+
+// DeleteCartAsync sends a(n) "temporal.Customer.DeleteCart" signal request to the child workflow
+func (r *CustomerFlowChildRun) DeleteCartAsync(ctx workflow.Context) workflow.Future {
+	return r.Future.SignalChildWorkflow(ctx, DeleteCartSignalName, nil)
+}
+
+// DeleteCartSignal describes a(n) temporal.Customer.DeleteCart signal
+type DeleteCartSignal struct {
 	Channel workflow.ReceiveChannel
 }
 
-// NewDeleteSignal initializes a new temporal.Customer.Delete signal wrapper
-func NewDeleteSignal(ctx workflow.Context) *DeleteSignal {
-	return &DeleteSignal{Channel: workflow.GetSignalChannel(ctx, DeleteSignalName)}
+// NewDeleteCartSignal initializes a new temporal.Customer.DeleteCart signal wrapper
+func NewDeleteCartSignal(ctx workflow.Context) *DeleteCartSignal {
+	return &DeleteCartSignal{Channel: workflow.GetSignalChannel(ctx, DeleteCartSignalName)}
 }
 
-// Receive blocks until a(n) temporal.Customer.Delete signal is received
-func (s *DeleteSignal) Receive(ctx workflow.Context) bool {
+// Receive blocks until a(n) temporal.Customer.DeleteCart signal is received
+func (s *DeleteCartSignal) Receive(ctx workflow.Context) bool {
 	more := s.Channel.Receive(ctx, nil)
 	return more
 }
 
-// ReceiveAsync checks for a temporal.Customer.Delete signal without blocking
-func (s *DeleteSignal) ReceiveAsync() bool {
+// ReceiveAsync checks for a temporal.Customer.DeleteCart signal without blocking
+func (s *DeleteCartSignal) ReceiveAsync() bool {
 	return s.Channel.ReceiveAsync(nil)
 }
 
-// ReceiveWithTimeout blocks until a(n) temporal.Customer.Delete signal is received or timeout expires.
+// ReceiveWithTimeout blocks until a(n) temporal.Customer.DeleteCart signal is received or timeout expires.
 // Returns more value of false when Channel is closed.
 // Returns ok value of false when no value was found in the channel for the duration of timeout or the ctx was canceled.
-func (s *DeleteSignal) ReceiveWithTimeout(ctx workflow.Context, timeout time.Duration) (ok bool, more bool) {
+func (s *DeleteCartSignal) ReceiveWithTimeout(ctx workflow.Context, timeout time.Duration) (ok bool, more bool) {
 	if ok, more = s.Channel.ReceiveWithTimeout(ctx, timeout, nil); !ok {
 		return false, more
 	}
 	return
 }
 
-// Select checks for a(n) temporal.Customer.Delete signal without blocking
-func (s *DeleteSignal) Select(sel workflow.Selector, fn func()) workflow.Selector {
+// Select checks for a(n) temporal.Customer.DeleteCart signal without blocking
+func (s *DeleteCartSignal) Select(sel workflow.Selector, fn func()) workflow.Selector {
+	return sel.AddReceive(s.Channel, func(workflow.ReceiveChannel, bool) {
+		s.ReceiveAsync()
+		if fn != nil {
+			fn()
+		}
+	})
+}
+
+// Удаление корзины юзера
+// https://docs.temporal.io/encyclopedia/workflow-message-passing#writing-signal-handlers
+func DeleteCartExternal(ctx workflow.Context, workflowID string, runID string) error {
+	return DeleteCartExternalAsync(ctx, workflowID, runID).Get(ctx, nil)
+}
+
+// Удаление корзины юзера
+// https://docs.temporal.io/encyclopedia/workflow-message-passing#writing-signal-handlers
+func DeleteCartExternalAsync(ctx workflow.Context, workflowID string, runID string) workflow.Future {
+	return workflow.SignalExternalWorkflow(ctx, workflowID, runID, DeleteCartSignalName, nil)
+}
+
+// DeleteProfileSignal describes a(n) temporal.Customer.DeleteProfile signal
+type DeleteProfileSignal struct {
+	Channel workflow.ReceiveChannel
+}
+
+// NewDeleteProfileSignal initializes a new temporal.Customer.DeleteProfile signal wrapper
+func NewDeleteProfileSignal(ctx workflow.Context) *DeleteProfileSignal {
+	return &DeleteProfileSignal{Channel: workflow.GetSignalChannel(ctx, DeleteProfileSignalName)}
+}
+
+// Receive blocks until a(n) temporal.Customer.DeleteProfile signal is received
+func (s *DeleteProfileSignal) Receive(ctx workflow.Context) bool {
+	more := s.Channel.Receive(ctx, nil)
+	return more
+}
+
+// ReceiveAsync checks for a temporal.Customer.DeleteProfile signal without blocking
+func (s *DeleteProfileSignal) ReceiveAsync() bool {
+	return s.Channel.ReceiveAsync(nil)
+}
+
+// ReceiveWithTimeout blocks until a(n) temporal.Customer.DeleteProfile signal is received or timeout expires.
+// Returns more value of false when Channel is closed.
+// Returns ok value of false when no value was found in the channel for the duration of timeout or the ctx was canceled.
+func (s *DeleteProfileSignal) ReceiveWithTimeout(ctx workflow.Context, timeout time.Duration) (ok bool, more bool) {
+	if ok, more = s.Channel.ReceiveWithTimeout(ctx, timeout, nil); !ok {
+		return false, more
+	}
+	return
+}
+
+// Select checks for a(n) temporal.Customer.DeleteProfile signal without blocking
+func (s *DeleteProfileSignal) Select(sel workflow.Selector, fn func()) workflow.Selector {
 	return sel.AddReceive(s.Channel, func(workflow.ReceiveChannel, bool) {
 		s.ReceiveAsync()
 		if fn != nil {
@@ -982,14 +1570,74 @@ func (s *DeleteSignal) Select(sel workflow.Selector, fn func()) workflow.Selecto
 
 // Удаление профиля. На самом деле это сигнал, который будет останавливать workflow с признаком отменен.
 // https://docs.temporal.io/encyclopedia/workflow-message-passing#writing-signal-handlers
-func DeleteExternal(ctx workflow.Context, workflowID string, runID string) error {
-	return DeleteExternalAsync(ctx, workflowID, runID).Get(ctx, nil)
+func DeleteProfileExternal(ctx workflow.Context, workflowID string, runID string) error {
+	return DeleteProfileExternalAsync(ctx, workflowID, runID).Get(ctx, nil)
 }
 
 // Удаление профиля. На самом деле это сигнал, который будет останавливать workflow с признаком отменен.
 // https://docs.temporal.io/encyclopedia/workflow-message-passing#writing-signal-handlers
-func DeleteExternalAsync(ctx workflow.Context, workflowID string, runID string) workflow.Future {
-	return workflow.SignalExternalWorkflow(ctx, workflowID, runID, DeleteSignalName, nil)
+func DeleteProfileExternalAsync(ctx workflow.Context, workflowID string, runID string) workflow.Future {
+	return workflow.SignalExternalWorkflow(ctx, workflowID, runID, DeleteProfileSignalName, nil)
+}
+
+// SetAddressSignal describes a(n) temporal.Customer.SetAddress signal
+type SetAddressSignal struct {
+	Channel workflow.ReceiveChannel
+}
+
+// NewSetAddressSignal initializes a new temporal.Customer.SetAddress signal wrapper
+func NewSetAddressSignal(ctx workflow.Context) *SetAddressSignal {
+	return &SetAddressSignal{Channel: workflow.GetSignalChannel(ctx, SetAddressSignalName)}
+}
+
+// Receive blocks until a(n) temporal.Customer.SetAddress signal is received
+func (s *SetAddressSignal) Receive(ctx workflow.Context) (*SetAddressRequest, bool) {
+	var resp SetAddressRequest
+	more := s.Channel.Receive(ctx, &resp)
+	return &resp, more
+}
+
+// ReceiveAsync checks for a temporal.Customer.SetAddress signal without blocking
+func (s *SetAddressSignal) ReceiveAsync() *SetAddressRequest {
+	var resp SetAddressRequest
+	if ok := s.Channel.ReceiveAsync(&resp); !ok {
+		return nil
+	}
+	return &resp
+}
+
+// ReceiveWithTimeout blocks until a(n) temporal.Customer.SetAddress signal is received or timeout expires.
+// Returns more value of false when Channel is closed.
+// Returns ok value of false when no value was found in the channel for the duration of timeout or the ctx was canceled.
+// resp will be nil if ok is false.
+func (s *SetAddressSignal) ReceiveWithTimeout(ctx workflow.Context, timeout time.Duration) (resp *SetAddressRequest, ok bool, more bool) {
+	resp = &SetAddressRequest{}
+	if ok, more = s.Channel.ReceiveWithTimeout(ctx, timeout, &resp); !ok {
+		return nil, false, more
+	}
+	return
+}
+
+// Select checks for a(n) temporal.Customer.SetAddress signal without blocking
+func (s *SetAddressSignal) Select(sel workflow.Selector, fn func(*SetAddressRequest)) workflow.Selector {
+	return sel.AddReceive(s.Channel, func(workflow.ReceiveChannel, bool) {
+		req := s.ReceiveAsync()
+		if fn != nil {
+			fn(req)
+		}
+	})
+}
+
+// Установка адреса
+// https://docs.temporal.io/encyclopedia/workflow-message-passing#writing-signal-handlers
+func SetAddressExternal(ctx workflow.Context, workflowID string, runID string, req *SetAddressRequest) error {
+	return SetAddressExternalAsync(ctx, workflowID, runID, req).Get(ctx, nil)
+}
+
+// Установка адреса
+// https://docs.temporal.io/encyclopedia/workflow-message-passing#writing-signal-handlers
+func SetAddressExternalAsync(ctx workflow.Context, workflowID string, runID string, req *SetAddressRequest) workflow.Future {
+	return workflow.SignalExternalWorkflow(ctx, workflowID, runID, SetAddressSignalName, req)
 }
 
 // CustomerActivities describes available worker activities
@@ -1017,33 +1665,33 @@ func NewTestCustomerClient(env *testsuite.TestWorkflowEnvironment, workflows Cus
 	return &TestCustomerClient{env, workflows}
 }
 
-// Create executes a(n) temporal.Customer.Create workflow in the test environment
-func (c *TestCustomerClient) Create(ctx context.Context, req *CreateRequest, opts ...*CreateOptions) error {
-	run, err := c.CreateAsync(ctx, req, opts...)
+// CustomerFlow executes a(n) temporal.Customer.CustomerFlow workflow in the test environment
+func (c *TestCustomerClient) CustomerFlow(ctx context.Context, req *CustomerFlowRequest, opts ...*CustomerFlowOptions) error {
+	run, err := c.CustomerFlowAsync(ctx, req, opts...)
 	if err != nil {
 		return err
 	}
 	return run.Get(ctx)
 }
 
-// CreateAsync executes a(n) temporal.Customer.Create workflow in the test environment
-func (c *TestCustomerClient) CreateAsync(ctx context.Context, req *CreateRequest, options ...*CreateOptions) (CreateRun, error) {
-	var o *CreateOptions
+// CustomerFlowAsync executes a(n) temporal.Customer.CustomerFlow workflow in the test environment
+func (c *TestCustomerClient) CustomerFlowAsync(ctx context.Context, req *CustomerFlowRequest, options ...*CustomerFlowOptions) (CustomerFlowRun, error) {
+	var o *CustomerFlowOptions
 	if len(options) > 0 && options[0] != nil {
 		o = options[0]
 	} else {
-		o = NewCreateOptions()
+		o = NewCustomerFlowOptions()
 	}
 	opts, err := o.Build(req.ProtoReflect())
 	if err != nil {
 		return nil, fmt.Errorf("error initializing client.StartWorkflowOptions: %w", err)
 	}
-	return &testCreateRun{client: c, env: c.env, opts: &opts, req: req, workflows: c.workflows}, nil
+	return &testCustomerFlowRun{client: c, env: c.env, opts: &opts, req: req, workflows: c.workflows}, nil
 }
 
-// GetCreate is a noop
-func (c *TestCustomerClient) GetCreate(ctx context.Context, workflowID string, runID string) CreateRun {
-	return &testCreateRun{env: c.env, workflows: c.workflows}
+// GetCustomerFlow is a noop
+func (c *TestCustomerClient) GetCustomerFlow(ctx context.Context, workflowID string, runID string) CustomerFlowRun {
+	return &testCustomerFlowRun{env: c.env, workflows: c.workflows}
 }
 
 // CancelWorkflow requests cancellation of an existing workflow execution
@@ -1057,9 +1705,25 @@ func (c *TestCustomerClient) TerminateWorkflow(ctx context.Context, workflowID s
 	return c.CancelWorkflow(ctx, workflowID, runID)
 }
 
-// Read executes a temporal.Customer.Read query
-func (c *TestCustomerClient) Read(ctx context.Context, workflowID string, runID string) (*Profile, error) {
-	val, err := c.env.QueryWorkflow(ReadQueryName)
+// GetCart executes a temporal.Customer.GetCart query
+func (c *TestCustomerClient) GetCart(ctx context.Context, workflowID string, runID string) (*Cart, error) {
+	val, err := c.env.QueryWorkflow(GetCartQueryName)
+	if err != nil {
+		return nil, err
+	} else if !val.HasValue() {
+		return nil, nil
+	} else {
+		var result Cart
+		if err := val.Get(&result); err != nil {
+			return nil, err
+		}
+		return &result, nil
+	}
+}
+
+// GetProfile executes a temporal.Customer.GetProfile query
+func (c *TestCustomerClient) GetProfile(ctx context.Context, workflowID string, runID string) (*Profile, error) {
+	val, err := c.env.QueryWorkflow(GetProfileQueryName)
 	if err != nil {
 		return nil, err
 	} else if !val.HasValue() {
@@ -1073,33 +1737,45 @@ func (c *TestCustomerClient) Read(ctx context.Context, workflowID string, runID 
 	}
 }
 
-// Delete executes a temporal.Customer.Delete signal
-func (c *TestCustomerClient) Delete(ctx context.Context, workflowID string, runID string) error {
-	c.env.SignalWorkflow(DeleteSignalName, nil)
+// DeleteCart executes a temporal.Customer.DeleteCart signal
+func (c *TestCustomerClient) DeleteCart(ctx context.Context, workflowID string, runID string) error {
+	c.env.SignalWorkflow(DeleteCartSignalName, nil)
 	return nil
 }
 
-// Update executes a(n) temporal.Customer.Update update in the test environment
-func (c *TestCustomerClient) Update(ctx context.Context, workflowID string, runID string, req *UpdateRequest, opts ...*UpdateOptions) (*Profile, error) {
-	options := NewUpdateOptions()
+// DeleteProfile executes a temporal.Customer.DeleteProfile signal
+func (c *TestCustomerClient) DeleteProfile(ctx context.Context, workflowID string, runID string) error {
+	c.env.SignalWorkflow(DeleteProfileSignalName, nil)
+	return nil
+}
+
+// SetAddress executes a temporal.Customer.SetAddress signal
+func (c *TestCustomerClient) SetAddress(ctx context.Context, workflowID string, runID string, req *SetAddressRequest) error {
+	c.env.SignalWorkflow(SetAddressSignalName, req)
+	return nil
+}
+
+// Checkout executes a(n) temporal.Customer.Checkout update in the test environment
+func (c *TestCustomerClient) Checkout(ctx context.Context, workflowID string, runID string, req *CheckoutRequest, opts ...*CheckoutOptions) (*Order, error) {
+	options := NewCheckoutOptions()
 	if len(opts) > 0 && opts[0].Options != nil {
 		options = opts[0]
 	}
 	options.Options.WaitForStage = client.WorkflowUpdateStageCompleted
-	handle, err := c.UpdateAsync(ctx, workflowID, runID, req, options)
+	handle, err := c.CheckoutAsync(ctx, workflowID, runID, req, options)
 	if err != nil {
 		return nil, err
 	}
 	return handle.Get(ctx)
 }
 
-// UpdateAsync executes a(n) temporal.Customer.Update update in the test environment
-func (c *TestCustomerClient) UpdateAsync(ctx context.Context, workflowID string, runID string, req *UpdateRequest, opts ...*UpdateOptions) (UpdateHandle, error) {
-	var o *UpdateOptions
+// CheckoutAsync executes a(n) temporal.Customer.Checkout update in the test environment
+func (c *TestCustomerClient) CheckoutAsync(ctx context.Context, workflowID string, runID string, req *CheckoutRequest, opts ...*CheckoutOptions) (CheckoutHandle, error) {
+	var o *CheckoutOptions
 	if len(opts) > 0 && opts[0] != nil {
 		o = opts[0]
 	} else {
-		o = NewUpdateOptions()
+		o = NewCheckoutOptions()
 	}
 	options, err := o.Build(workflowID, runID, req)
 	if err != nil {
@@ -1111,8 +1787,8 @@ func (c *TestCustomerClient) UpdateAsync(ctx context.Context, workflowID string,
 	}
 
 	uc := testutil.NewUpdateCallbacks()
-	c.env.UpdateWorkflow(UpdateUpdateName, options.UpdateID, uc, req)
-	return &testUpdateHandle{
+	c.env.UpdateWorkflow(CheckoutUpdateName, options.UpdateID, uc, req)
+	return &testCheckoutHandle{
 		callbacks:  uc,
 		env:        c.env,
 		opts:       options,
@@ -1122,25 +1798,199 @@ func (c *TestCustomerClient) UpdateAsync(ctx context.Context, workflowID string,
 	}, nil
 }
 
-// GetUpdate retrieves a handle to an existing temporal.Customer.Update update
-func (c *TestCustomerClient) GetUpdate(ctx context.Context, req client.GetWorkflowUpdateHandleOptions) (UpdateHandle, error) {
+// GetCheckout retrieves a handle to an existing temporal.Customer.Checkout update
+func (c *TestCustomerClient) GetCheckout(ctx context.Context, req client.GetWorkflowUpdateHandleOptions) (CheckoutHandle, error) {
 	return nil, errors.New("unimplemented")
 }
 
-var _ UpdateHandle = &testUpdateHandle{}
+var _ CheckoutHandle = &testCheckoutHandle{}
 
-// testUpdateHandle provides an internal implementation of a(n) UpdateHandle
-type testUpdateHandle struct {
+// testCheckoutHandle provides an internal implementation of a(n) CheckoutHandle
+type testCheckoutHandle struct {
 	callbacks  *testutil.UpdateCallbacks
 	env        *testsuite.TestWorkflowEnvironment
 	opts       *client.UpdateWorkflowOptions
-	req        *UpdateRequest
+	req        *CheckoutRequest
 	runID      string
 	workflowID string
 }
 
-// Get retrieves a test temporal.Customer.Update update result
-func (h *testUpdateHandle) Get(ctx context.Context) (*Profile, error) {
+// Get retrieves a test temporal.Customer.Checkout update result
+func (h *testCheckoutHandle) Get(ctx context.Context) (*Order, error) {
+	if resp, err := h.callbacks.Get(ctx); err != nil {
+		return nil, err
+	} else {
+		return resp.(*Order), nil
+	}
+}
+
+// RunID implementation
+func (h *testCheckoutHandle) RunID() string {
+	return h.runID
+}
+
+// UpdateID implementation
+func (h *testCheckoutHandle) UpdateID() string {
+	if h.opts != nil {
+		return h.opts.UpdateID
+	}
+	return ""
+}
+
+// WorkflowID implementation
+func (h *testCheckoutHandle) WorkflowID() string {
+	return h.workflowID
+}
+
+// UpdateCart executes a(n) temporal.Customer.UpdateCart update in the test environment
+func (c *TestCustomerClient) UpdateCart(ctx context.Context, workflowID string, runID string, req *UpdateCartRequest, opts ...*UpdateCartOptions) (*Cart, error) {
+	options := NewUpdateCartOptions()
+	if len(opts) > 0 && opts[0].Options != nil {
+		options = opts[0]
+	}
+	options.Options.WaitForStage = client.WorkflowUpdateStageCompleted
+	handle, err := c.UpdateCartAsync(ctx, workflowID, runID, req, options)
+	if err != nil {
+		return nil, err
+	}
+	return handle.Get(ctx)
+}
+
+// UpdateCartAsync executes a(n) temporal.Customer.UpdateCart update in the test environment
+func (c *TestCustomerClient) UpdateCartAsync(ctx context.Context, workflowID string, runID string, req *UpdateCartRequest, opts ...*UpdateCartOptions) (UpdateCartHandle, error) {
+	var o *UpdateCartOptions
+	if len(opts) > 0 && opts[0] != nil {
+		o = opts[0]
+	} else {
+		o = NewUpdateCartOptions()
+	}
+	options, err := o.Build(workflowID, runID, req)
+	if err != nil {
+		return nil, fmt.Errorf("error initializing UpdateWorkflowWithOptions: %w", err)
+	}
+
+	if options.UpdateID == "" {
+		options.UpdateID = workflowID
+	}
+
+	uc := testutil.NewUpdateCallbacks()
+	c.env.UpdateWorkflow(UpdateCartUpdateName, options.UpdateID, uc, req)
+	return &testUpdateCartHandle{
+		callbacks:  uc,
+		env:        c.env,
+		opts:       options,
+		runID:      runID,
+		workflowID: workflowID,
+		req:        req,
+	}, nil
+}
+
+// GetUpdateCart retrieves a handle to an existing temporal.Customer.UpdateCart update
+func (c *TestCustomerClient) GetUpdateCart(ctx context.Context, req client.GetWorkflowUpdateHandleOptions) (UpdateCartHandle, error) {
+	return nil, errors.New("unimplemented")
+}
+
+var _ UpdateCartHandle = &testUpdateCartHandle{}
+
+// testUpdateCartHandle provides an internal implementation of a(n) UpdateCartHandle
+type testUpdateCartHandle struct {
+	callbacks  *testutil.UpdateCallbacks
+	env        *testsuite.TestWorkflowEnvironment
+	opts       *client.UpdateWorkflowOptions
+	req        *UpdateCartRequest
+	runID      string
+	workflowID string
+}
+
+// Get retrieves a test temporal.Customer.UpdateCart update result
+func (h *testUpdateCartHandle) Get(ctx context.Context) (*Cart, error) {
+	if resp, err := h.callbacks.Get(ctx); err != nil {
+		return nil, err
+	} else {
+		return resp.(*Cart), nil
+	}
+}
+
+// RunID implementation
+func (h *testUpdateCartHandle) RunID() string {
+	return h.runID
+}
+
+// UpdateID implementation
+func (h *testUpdateCartHandle) UpdateID() string {
+	if h.opts != nil {
+		return h.opts.UpdateID
+	}
+	return ""
+}
+
+// WorkflowID implementation
+func (h *testUpdateCartHandle) WorkflowID() string {
+	return h.workflowID
+}
+
+// UpdateProfile executes a(n) temporal.Customer.UpdateProfile update in the test environment
+func (c *TestCustomerClient) UpdateProfile(ctx context.Context, workflowID string, runID string, req *UpdateProfileRequest, opts ...*UpdateProfileOptions) (*Profile, error) {
+	options := NewUpdateProfileOptions()
+	if len(opts) > 0 && opts[0].Options != nil {
+		options = opts[0]
+	}
+	options.Options.WaitForStage = client.WorkflowUpdateStageCompleted
+	handle, err := c.UpdateProfileAsync(ctx, workflowID, runID, req, options)
+	if err != nil {
+		return nil, err
+	}
+	return handle.Get(ctx)
+}
+
+// UpdateProfileAsync executes a(n) temporal.Customer.UpdateProfile update in the test environment
+func (c *TestCustomerClient) UpdateProfileAsync(ctx context.Context, workflowID string, runID string, req *UpdateProfileRequest, opts ...*UpdateProfileOptions) (UpdateProfileHandle, error) {
+	var o *UpdateProfileOptions
+	if len(opts) > 0 && opts[0] != nil {
+		o = opts[0]
+	} else {
+		o = NewUpdateProfileOptions()
+	}
+	options, err := o.Build(workflowID, runID, req)
+	if err != nil {
+		return nil, fmt.Errorf("error initializing UpdateWorkflowWithOptions: %w", err)
+	}
+
+	if options.UpdateID == "" {
+		options.UpdateID = workflowID
+	}
+
+	uc := testutil.NewUpdateCallbacks()
+	c.env.UpdateWorkflow(UpdateProfileUpdateName, options.UpdateID, uc, req)
+	return &testUpdateProfileHandle{
+		callbacks:  uc,
+		env:        c.env,
+		opts:       options,
+		runID:      runID,
+		workflowID: workflowID,
+		req:        req,
+	}, nil
+}
+
+// GetUpdateProfile retrieves a handle to an existing temporal.Customer.UpdateProfile update
+func (c *TestCustomerClient) GetUpdateProfile(ctx context.Context, req client.GetWorkflowUpdateHandleOptions) (UpdateProfileHandle, error) {
+	return nil, errors.New("unimplemented")
+}
+
+var _ UpdateProfileHandle = &testUpdateProfileHandle{}
+
+// testUpdateProfileHandle provides an internal implementation of a(n) UpdateProfileHandle
+type testUpdateProfileHandle struct {
+	callbacks  *testutil.UpdateCallbacks
+	env        *testsuite.TestWorkflowEnvironment
+	opts       *client.UpdateWorkflowOptions
+	req        *UpdateProfileRequest
+	runID      string
+	workflowID string
+}
+
+// Get retrieves a test temporal.Customer.UpdateProfile update result
+func (h *testUpdateProfileHandle) Get(ctx context.Context) (*Profile, error) {
 	if resp, err := h.callbacks.Get(ctx); err != nil {
 		return nil, err
 	} else {
@@ -1149,12 +1999,12 @@ func (h *testUpdateHandle) Get(ctx context.Context) (*Profile, error) {
 }
 
 // RunID implementation
-func (h *testUpdateHandle) RunID() string {
+func (h *testUpdateProfileHandle) RunID() string {
 	return h.runID
 }
 
 // UpdateID implementation
-func (h *testUpdateHandle) UpdateID() string {
+func (h *testUpdateProfileHandle) UpdateID() string {
 	if h.opts != nil {
 		return h.opts.UpdateID
 	}
@@ -1162,29 +2012,29 @@ func (h *testUpdateHandle) UpdateID() string {
 }
 
 // WorkflowID implementation
-func (h *testUpdateHandle) WorkflowID() string {
+func (h *testUpdateProfileHandle) WorkflowID() string {
 	return h.workflowID
 }
 
-var _ CreateRun = &testCreateRun{}
+var _ CustomerFlowRun = &testCustomerFlowRun{}
 
-// testCreateRun provides convenience methods for interacting with a(n) temporal.Customer.Create workflow in the test environment
-type testCreateRun struct {
+// testCustomerFlowRun provides convenience methods for interacting with a(n) temporal.Customer.CustomerFlow workflow in the test environment
+type testCustomerFlowRun struct {
 	client    *TestCustomerClient
 	env       *testsuite.TestWorkflowEnvironment
 	opts      *client.StartWorkflowOptions
-	req       *CreateRequest
+	req       *CustomerFlowRequest
 	workflows CustomerWorkflows
 }
 
 // Cancel requests cancellation of a workflow in execution, returning an error if applicable
-func (r *testCreateRun) Cancel(ctx context.Context) error {
+func (r *testCustomerFlowRun) Cancel(ctx context.Context) error {
 	return r.client.CancelWorkflow(ctx, r.ID(), r.RunID())
 }
 
-// Get retrieves a test temporal.Customer.Create workflow result
-func (r *testCreateRun) Get(context.Context) error {
-	r.env.ExecuteWorkflow(CreateWorkflowName, r.req)
+// Get retrieves a test temporal.Customer.CustomerFlow workflow result
+func (r *testCustomerFlowRun) Get(context.Context) error {
+	r.env.ExecuteWorkflow(CustomerFlowWorkflowName, r.req)
 	if !r.env.IsWorkflowCompleted() {
 		return errors.New("workflow in progress")
 	}
@@ -1194,8 +2044,8 @@ func (r *testCreateRun) Get(context.Context) error {
 	return nil
 }
 
-// ID returns a test temporal.Customer.Create workflow run's workflow ID
-func (r *testCreateRun) ID() string {
+// ID returns a test temporal.Customer.CustomerFlow workflow run's workflow ID
+func (r *testCustomerFlowRun) ID() string {
 	if r.opts != nil {
 		return r.opts.ID
 	}
@@ -1203,38 +2053,73 @@ func (r *testCreateRun) ID() string {
 }
 
 // Run noop implementation
-func (r *testCreateRun) Run() client.WorkflowRun {
+func (r *testCustomerFlowRun) Run() client.WorkflowRun {
 	return nil
 }
 
 // RunID noop implementation
-func (r *testCreateRun) RunID() string {
+func (r *testCustomerFlowRun) RunID() string {
 	return ""
 }
 
 // Terminate terminates a workflow in execution, returning an error if applicable
-func (r *testCreateRun) Terminate(ctx context.Context, reason string, details ...interface{}) error {
+func (r *testCustomerFlowRun) Terminate(ctx context.Context, reason string, details ...interface{}) error {
 	return r.client.TerminateWorkflow(ctx, r.ID(), r.RunID(), reason, details...)
 }
 
-// Read executes a temporal.Customer.Read query against a test temporal.Customer.Create workflow
-func (r *testCreateRun) Read(ctx context.Context) (*Profile, error) {
-	return r.client.Read(ctx, r.ID(), r.RunID())
+// GetProfile executes a temporal.Customer.GetProfile query against a test temporal.Customer.CustomerFlow workflow
+func (r *testCustomerFlowRun) GetProfile(ctx context.Context) (*Profile, error) {
+	return r.client.GetProfile(ctx, r.ID(), r.RunID())
 }
 
-// Delete executes a temporal.Customer.Delete signal against a test temporal.Customer.Create workflow
-func (r *testCreateRun) Delete(ctx context.Context) error {
-	return r.client.Delete(ctx, r.ID(), r.RunID())
+// GetCart executes a temporal.Customer.GetCart query against a test temporal.Customer.CustomerFlow workflow
+func (r *testCustomerFlowRun) GetCart(ctx context.Context) (*Cart, error) {
+	return r.client.GetCart(ctx, r.ID(), r.RunID())
 }
 
-// Update executes a(n) temporal.Customer.Update update against a test temporal.Customer.Create workflow
-func (r *testCreateRun) Update(ctx context.Context, req *UpdateRequest, opts ...*UpdateOptions) (*Profile, error) {
-	return r.client.Update(ctx, r.ID(), r.RunID(), req, opts...)
+// DeleteProfile executes a temporal.Customer.DeleteProfile signal against a test temporal.Customer.CustomerFlow workflow
+func (r *testCustomerFlowRun) DeleteProfile(ctx context.Context) error {
+	return r.client.DeleteProfile(ctx, r.ID(), r.RunID())
 }
 
-// UpdateAsync executes a(n) temporal.Customer.Update update against a test temporal.Customer.Create workflow
-func (r *testCreateRun) UpdateAsync(ctx context.Context, req *UpdateRequest, opts ...*UpdateOptions) (UpdateHandle, error) {
-	return r.client.UpdateAsync(ctx, r.ID(), r.RunID(), req, opts...)
+// SetAddress executes a temporal.Customer.SetAddress signal against a test temporal.Customer.CustomerFlow workflow
+func (r *testCustomerFlowRun) SetAddress(ctx context.Context, req *SetAddressRequest) error {
+	return r.client.SetAddress(ctx, r.ID(), r.RunID(), req)
+}
+
+// DeleteCart executes a temporal.Customer.DeleteCart signal against a test temporal.Customer.CustomerFlow workflow
+func (r *testCustomerFlowRun) DeleteCart(ctx context.Context) error {
+	return r.client.DeleteCart(ctx, r.ID(), r.RunID())
+}
+
+// UpdateProfile executes a(n) temporal.Customer.UpdateProfile update against a test temporal.Customer.CustomerFlow workflow
+func (r *testCustomerFlowRun) UpdateProfile(ctx context.Context, req *UpdateProfileRequest, opts ...*UpdateProfileOptions) (*Profile, error) {
+	return r.client.UpdateProfile(ctx, r.ID(), r.RunID(), req, opts...)
+}
+
+// UpdateProfileAsync executes a(n) temporal.Customer.UpdateProfile update against a test temporal.Customer.CustomerFlow workflow
+func (r *testCustomerFlowRun) UpdateProfileAsync(ctx context.Context, req *UpdateProfileRequest, opts ...*UpdateProfileOptions) (UpdateProfileHandle, error) {
+	return r.client.UpdateProfileAsync(ctx, r.ID(), r.RunID(), req, opts...)
+}
+
+// UpdateCart executes a(n) temporal.Customer.UpdateCart update against a test temporal.Customer.CustomerFlow workflow
+func (r *testCustomerFlowRun) UpdateCart(ctx context.Context, req *UpdateCartRequest, opts ...*UpdateCartOptions) (*Cart, error) {
+	return r.client.UpdateCart(ctx, r.ID(), r.RunID(), req, opts...)
+}
+
+// UpdateCartAsync executes a(n) temporal.Customer.UpdateCart update against a test temporal.Customer.CustomerFlow workflow
+func (r *testCustomerFlowRun) UpdateCartAsync(ctx context.Context, req *UpdateCartRequest, opts ...*UpdateCartOptions) (UpdateCartHandle, error) {
+	return r.client.UpdateCartAsync(ctx, r.ID(), r.RunID(), req, opts...)
+}
+
+// Checkout executes a(n) temporal.Customer.Checkout update against a test temporal.Customer.CustomerFlow workflow
+func (r *testCustomerFlowRun) Checkout(ctx context.Context, req *CheckoutRequest, opts ...*CheckoutOptions) (*Order, error) {
+	return r.client.Checkout(ctx, r.ID(), r.RunID(), req, opts...)
+}
+
+// CheckoutAsync executes a(n) temporal.Customer.Checkout update against a test temporal.Customer.CustomerFlow workflow
+func (r *testCustomerFlowRun) CheckoutAsync(ctx context.Context, req *CheckoutRequest, opts ...*CheckoutOptions) (CheckoutHandle, error) {
+	return r.client.CheckoutAsync(ctx, r.ID(), r.RunID(), req, opts...)
 }
 
 // CustomerCliOptions describes runtime configuration for temporal.Customer cli
@@ -1312,7 +2197,50 @@ func newCustomerCommands(options ...*CustomerCliOptions) ([]*v2.Command, error) 
 	}
 	commands := []*v2.Command{
 		{
-			Name:                   "read",
+			Name:                   "get-cart",
+			Usage:                  "Получение активной корзины пользователя https://docs.temporal.io/encyclopedia/workflow-message-passing#writing-query-handlers",
+			Category:               "QUERIES",
+			UseShortOptionHandling: true,
+			Before:                 opts.before,
+			After:                  opts.after,
+			Flags: []v2.Flag{
+				&v2.StringFlag{
+					Name:     "workflow-id",
+					Usage:    "workflow id",
+					Required: true,
+					Aliases:  []string{"w"},
+				},
+				&v2.StringFlag{
+					Name:    "run-id",
+					Usage:   "run id",
+					Aliases: []string{"r"},
+				},
+			},
+			Action: func(cmd *v2.Context) error {
+				c, err := opts.clientForCommand(cmd)
+				if err != nil {
+					return fmt.Errorf("error initializing client for command: %w", err)
+				}
+				defer c.Close()
+				client := NewCustomerClient(c)
+				if resp, err := client.GetCart(cmd.Context, cmd.String("workflow-id"), cmd.String("run-id")); err != nil {
+					return fmt.Errorf("error executing %q query: %w", GetCartQueryName, err)
+				} else {
+					b, err := protojson.Marshal(resp)
+					if err != nil {
+						return fmt.Errorf("error serializing response json: %w", err)
+					}
+					var out bytes.Buffer
+					if err := json.Indent(&out, b, "", "  "); err != nil {
+						return fmt.Errorf("error formatting json: %w", err)
+					}
+					fmt.Println(out.String())
+					return nil
+				}
+			},
+		},
+		{
+			Name:                   "get-profile",
 			Usage:                  "Получение профиля из запущенного workflow https://docs.temporal.io/encyclopedia/workflow-message-passing#writing-query-handlers",
 			Category:               "QUERIES",
 			UseShortOptionHandling: true,
@@ -1338,8 +2266,8 @@ func newCustomerCommands(options ...*CustomerCliOptions) ([]*v2.Command, error) 
 				}
 				defer c.Close()
 				client := NewCustomerClient(c)
-				if resp, err := client.Read(cmd.Context, cmd.String("workflow-id"), cmd.String("run-id")); err != nil {
-					return fmt.Errorf("error executing %q query: %w", ReadQueryName, err)
+				if resp, err := client.GetProfile(cmd.Context, cmd.String("workflow-id"), cmd.String("run-id")); err != nil {
+					return fmt.Errorf("error executing %q query: %w", GetProfileQueryName, err)
 				} else {
 					b, err := protojson.Marshal(resp)
 					if err != nil {
@@ -1355,7 +2283,41 @@ func newCustomerCommands(options ...*CustomerCliOptions) ([]*v2.Command, error) 
 			},
 		},
 		{
-			Name:                   "delete",
+			Name:                   "delete-cart",
+			Usage:                  "Удаление корзины юзера https://docs.temporal.io/encyclopedia/workflow-message-passing#writing-signal-handlers",
+			Category:               "SIGNALS",
+			UseShortOptionHandling: true,
+			Before:                 opts.before,
+			After:                  opts.after,
+			Flags: []v2.Flag{
+				&v2.StringFlag{
+					Name:     "workflow-id",
+					Usage:    "workflow id",
+					Required: true,
+					Aliases:  []string{"w"},
+				},
+				&v2.StringFlag{
+					Name:    "run-id",
+					Usage:   "run id",
+					Aliases: []string{"r"},
+				},
+			},
+			Action: func(cmd *v2.Context) error {
+				c, err := opts.clientForCommand(cmd)
+				if err != nil {
+					return fmt.Errorf("error initializing client for command: %w", err)
+				}
+				defer c.Close()
+				client := NewCustomerClient(c)
+				if err := client.DeleteCart(cmd.Context, cmd.String("workflow-id"), cmd.String("run-id")); err != nil {
+					return fmt.Errorf("error sending %q signal: %w", DeleteCartSignalName, err)
+				}
+				fmt.Println("success")
+				return nil
+			},
+		},
+		{
+			Name:                   "delete-profile",
 			Usage:                  "Удаление профиля. На самом деле это сигнал, который будет останавливать workflow с признаком отменен. https://docs.temporal.io/encyclopedia/workflow-message-passing#writing-signal-handlers",
 			Category:               "SIGNALS",
 			UseShortOptionHandling: true,
@@ -1381,15 +2343,209 @@ func newCustomerCommands(options ...*CustomerCliOptions) ([]*v2.Command, error) 
 				}
 				defer c.Close()
 				client := NewCustomerClient(c)
-				if err := client.Delete(cmd.Context, cmd.String("workflow-id"), cmd.String("run-id")); err != nil {
-					return fmt.Errorf("error sending %q signal: %w", DeleteSignalName, err)
+				if err := client.DeleteProfile(cmd.Context, cmd.String("workflow-id"), cmd.String("run-id")); err != nil {
+					return fmt.Errorf("error sending %q signal: %w", DeleteProfileSignalName, err)
 				}
 				fmt.Println("success")
 				return nil
 			},
 		},
 		{
-			Name:                   "update",
+			Name:                   "set-address",
+			Usage:                  "Установка адреса https://docs.temporal.io/encyclopedia/workflow-message-passing#writing-signal-handlers",
+			Category:               "SIGNALS",
+			UseShortOptionHandling: true,
+			Before:                 opts.before,
+			After:                  opts.after,
+			Flags: []v2.Flag{
+				&v2.StringFlag{
+					Name:     "workflow-id",
+					Usage:    "workflow id",
+					Required: true,
+					Aliases:  []string{"w"},
+				},
+				&v2.StringFlag{
+					Name:    "run-id",
+					Usage:   "run id",
+					Aliases: []string{"r"},
+				},
+				&v2.StringFlag{
+					Name:    "input-file",
+					Usage:   "path to json-formatted input file",
+					Aliases: []string{"f"},
+				},
+				&v2.StringFlag{
+					Name:     "address",
+					Usage:    "set the value of the operation's \"Address\" parameter (json-encoded: {title: <string>, lat: <string>, long: <string>})",
+					Category: "INPUT",
+				},
+			},
+			Action: func(cmd *v2.Context) error {
+				c, err := opts.clientForCommand(cmd)
+				if err != nil {
+					return fmt.Errorf("error initializing client for command: %w", err)
+				}
+				defer c.Close()
+				client := NewCustomerClient(c)
+				req, err := UnmarshalCliFlagsToSetAddressRequest(cmd)
+				if err != nil {
+					return fmt.Errorf("error unmarshalling request: %w", err)
+				}
+				if err := client.SetAddress(cmd.Context, cmd.String("workflow-id"), cmd.String("run-id"), req); err != nil {
+					return fmt.Errorf("error sending %q signal: %w", SetAddressSignalName, err)
+				}
+				fmt.Println("success")
+				return nil
+			},
+		},
+		{
+			Name:                   "checkout",
+			Usage:                  "Создание заказа через update-handler https://docs.temporal.io/encyclopedia/workflow-message-passing#writing-query-handlers",
+			Category:               "UPDATES",
+			UseShortOptionHandling: true,
+			Before:                 opts.before,
+			After:                  opts.after,
+			Flags: []v2.Flag{
+				&v2.BoolFlag{
+					Name:    "detach",
+					Usage:   "run workflow update in the background and print workflow, execution, and udpate id",
+					Aliases: []string{"d"},
+				},
+				&v2.StringFlag{
+					Name:     "workflow-id",
+					Usage:    "workflow id",
+					Required: true,
+					Aliases:  []string{"w"},
+				},
+				&v2.StringFlag{
+					Name:    "run-id",
+					Usage:   "run id",
+					Aliases: []string{"r"},
+				},
+				&v2.StringFlag{
+					Name:    "input-file",
+					Usage:   "path to json-formatted input file",
+					Aliases: []string{"f"},
+				},
+				&v2.StringFlag{
+					Name:     "payment-type",
+					Usage:    "set the value of the operation's \"PaymentType\" parameter (CASH, ONLINE)",
+					Category: "INPUT",
+				},
+			},
+			Action: func(cmd *v2.Context) error {
+				c, err := opts.clientForCommand(cmd)
+				if err != nil {
+					return fmt.Errorf("error initializing client for command: %w", err)
+				}
+				defer c.Close()
+				client := NewCustomerClient(c)
+				req, err := UnmarshalCliFlagsToCheckoutRequest(cmd)
+				if err != nil {
+					return fmt.Errorf("error unmarshalling request: %w", err)
+				}
+				handle, err := client.CheckoutAsync(cmd.Context, cmd.String("workflow-id"), cmd.String("run-id"), req)
+				if err != nil {
+					return fmt.Errorf("error executing %s update: %w", CheckoutUpdateName, err)
+				}
+				if cmd.Bool("detach") {
+					fmt.Println("success")
+					fmt.Printf("workflow id: %s\n", handle.WorkflowID())
+					fmt.Printf("run id: %s\n", handle.RunID())
+					fmt.Printf("update id: %s\n", handle.UpdateID())
+					return nil
+				}
+				if resp, err := handle.Get(cmd.Context); err != nil {
+					return err
+				} else {
+					b, err := protojson.Marshal(resp)
+					if err != nil {
+						return fmt.Errorf("error serializing response json: %w", err)
+					}
+					var out bytes.Buffer
+					if err := json.Indent(&out, b, "", "  "); err != nil {
+						return fmt.Errorf("error formatting json: %w", err)
+					}
+					fmt.Println(out.String())
+					return nil
+				}
+			},
+		},
+		{
+			Name:                   "update-cart",
+			Usage:                  "Обновление или создание корзины https://docs.temporal.io/encyclopedia/workflow-message-passing#writing-query-handlers",
+			Category:               "UPDATES",
+			UseShortOptionHandling: true,
+			Before:                 opts.before,
+			After:                  opts.after,
+			Flags: []v2.Flag{
+				&v2.BoolFlag{
+					Name:    "detach",
+					Usage:   "run workflow update in the background and print workflow, execution, and udpate id",
+					Aliases: []string{"d"},
+				},
+				&v2.StringFlag{
+					Name:     "workflow-id",
+					Usage:    "workflow id",
+					Required: true,
+					Aliases:  []string{"w"},
+				},
+				&v2.StringFlag{
+					Name:    "run-id",
+					Usage:   "run id",
+					Aliases: []string{"r"},
+				},
+				&v2.StringFlag{
+					Name:    "input-file",
+					Usage:   "path to json-formatted input file",
+					Aliases: []string{"f"},
+				},
+				&v2.StringSliceFlag{
+					Name:     "products",
+					Usage:    "set the value of the operation's \"Products\" parameter (json-encoded: {id: <string>, name: <string>, price: <int32>, inn: <string>, qty: <int32>})",
+					Category: "INPUT",
+				},
+			},
+			Action: func(cmd *v2.Context) error {
+				c, err := opts.clientForCommand(cmd)
+				if err != nil {
+					return fmt.Errorf("error initializing client for command: %w", err)
+				}
+				defer c.Close()
+				client := NewCustomerClient(c)
+				req, err := UnmarshalCliFlagsToUpdateCartRequest(cmd)
+				if err != nil {
+					return fmt.Errorf("error unmarshalling request: %w", err)
+				}
+				handle, err := client.UpdateCartAsync(cmd.Context, cmd.String("workflow-id"), cmd.String("run-id"), req)
+				if err != nil {
+					return fmt.Errorf("error executing %s update: %w", UpdateCartUpdateName, err)
+				}
+				if cmd.Bool("detach") {
+					fmt.Println("success")
+					fmt.Printf("workflow id: %s\n", handle.WorkflowID())
+					fmt.Printf("run id: %s\n", handle.RunID())
+					fmt.Printf("update id: %s\n", handle.UpdateID())
+					return nil
+				}
+				if resp, err := handle.Get(cmd.Context); err != nil {
+					return err
+				} else {
+					b, err := protojson.Marshal(resp)
+					if err != nil {
+						return fmt.Errorf("error serializing response json: %w", err)
+					}
+					var out bytes.Buffer
+					if err := json.Indent(&out, b, "", "  "); err != nil {
+						return fmt.Errorf("error formatting json: %w", err)
+					}
+					fmt.Println(out.String())
+					return nil
+				}
+			},
+		},
+		{
+			Name:                   "update-profile",
 			Usage:                  "Обновление профиля в запущенном workflow https://docs.temporal.io/encyclopedia/workflow-message-passing#writing-query-handlers",
 			Category:               "UPDATES",
 			UseShortOptionHandling: true,
@@ -1430,13 +2586,13 @@ func newCustomerCommands(options ...*CustomerCliOptions) ([]*v2.Command, error) 
 				}
 				defer c.Close()
 				client := NewCustomerClient(c)
-				req, err := UnmarshalCliFlagsToUpdateRequest(cmd)
+				req, err := UnmarshalCliFlagsToUpdateProfileRequest(cmd)
 				if err != nil {
 					return fmt.Errorf("error unmarshalling request: %w", err)
 				}
-				handle, err := client.UpdateAsync(cmd.Context, cmd.String("workflow-id"), cmd.String("run-id"), req)
+				handle, err := client.UpdateProfileAsync(cmd.Context, cmd.String("workflow-id"), cmd.String("run-id"), req)
 				if err != nil {
-					return fmt.Errorf("error executing %s update: %w", UpdateUpdateName, err)
+					return fmt.Errorf("error executing %s update: %w", UpdateProfileUpdateName, err)
 				}
 				if cmd.Bool("detach") {
 					fmt.Println("success")
@@ -1462,7 +2618,7 @@ func newCustomerCommands(options ...*CustomerCliOptions) ([]*v2.Command, error) 
 			},
 		},
 		{
-			Name:                   "create",
+			Name:                   "customer-flow",
 			Usage:                  "Это основной workflow, представляющий жизненный цикл пользователя",
 			Category:               "WORKFLOWS",
 			UseShortOptionHandling: true,
@@ -1504,7 +2660,7 @@ func newCustomerCommands(options ...*CustomerCliOptions) ([]*v2.Command, error) 
 				}
 				defer tc.Close()
 				c := NewCustomerClient(tc)
-				req, err := UnmarshalCliFlagsToCreateRequest(cmd)
+				req, err := UnmarshalCliFlagsToCustomerFlowRequest(cmd)
 				if err != nil {
 					return fmt.Errorf("error unmarshalling request: %w", err)
 				}
@@ -1512,9 +2668,9 @@ func newCustomerCommands(options ...*CustomerCliOptions) ([]*v2.Command, error) 
 				if tq := cmd.String("task-queue"); tq != "" {
 					opts.TaskQueue = tq
 				}
-				run, err := c.CreateAsync(cmd.Context, req, NewCreateOptions().WithStartWorkflowOptions(opts))
+				run, err := c.CustomerFlowAsync(cmd.Context, req, NewCustomerFlowOptions().WithStartWorkflowOptions(opts))
 				if err != nil {
-					return fmt.Errorf("error starting %s workflow: %w", CreateWorkflowName, err)
+					return fmt.Errorf("error starting %s workflow: %w", CustomerFlowWorkflowName, err)
 				}
 				if cmd.Bool("detach") {
 					fmt.Println("success")
@@ -1566,9 +2722,107 @@ func newCustomerCommands(options ...*CustomerCliOptions) ([]*v2.Command, error) 
 	return commands, nil
 }
 
-// UnmarshalCliFlagsToUpdateRequest unmarshals a UpdateRequest from command line flags
-func UnmarshalCliFlagsToUpdateRequest(cmd *v2.Context, options ...helpers.UnmarshalCliFlagsOptions) (*UpdateRequest, error) {
-	var result UpdateRequest
+// UnmarshalCliFlagsToSetAddressRequest unmarshals a SetAddressRequest from command line flags
+func UnmarshalCliFlagsToSetAddressRequest(cmd *v2.Context, options ...helpers.UnmarshalCliFlagsOptions) (*SetAddressRequest, error) {
+	var result SetAddressRequest
+	if cmd.IsSet("input-file") {
+		inputFile, err := gohomedir.Expand(cmd.String("input-file"))
+		if err != nil {
+			inputFile = cmd.String("input-file")
+		}
+		b, err := os.ReadFile(inputFile)
+		if err != nil {
+			return nil, fmt.Errorf("error reading input-file: %w", err)
+		}
+		if err := protojson.Unmarshal(b, &result); err != nil {
+			return nil, fmt.Errorf("error parsing input-file json: %w", err)
+		}
+	}
+	opts := helpers.UnmarshalCliFlagsOptions{}
+	if len(options) > 0 {
+		opts = options[0]
+	}
+	if flag := opts.FlagName("address"); cmd.IsSet(flag) {
+		var tmp Address
+		if err := protojson.Unmarshal([]byte(cmd.String(flag)), &tmp); err != nil {
+			return nil, fmt.Errorf("error unmarshalling \"address\" flag: %w", err)
+		}
+		value := &tmp
+		result.Address = value
+	}
+	return &result, nil
+}
+
+// UnmarshalCliFlagsToCheckoutRequest unmarshals a CheckoutRequest from command line flags
+func UnmarshalCliFlagsToCheckoutRequest(cmd *v2.Context, options ...helpers.UnmarshalCliFlagsOptions) (*CheckoutRequest, error) {
+	var result CheckoutRequest
+	if cmd.IsSet("input-file") {
+		inputFile, err := gohomedir.Expand(cmd.String("input-file"))
+		if err != nil {
+			inputFile = cmd.String("input-file")
+		}
+		b, err := os.ReadFile(inputFile)
+		if err != nil {
+			return nil, fmt.Errorf("error reading input-file: %w", err)
+		}
+		if err := protojson.Unmarshal(b, &result); err != nil {
+			return nil, fmt.Errorf("error parsing input-file json: %w", err)
+		}
+	}
+	opts := helpers.UnmarshalCliFlagsOptions{}
+	if len(options) > 0 {
+		opts = options[0]
+	}
+	if flag := opts.FlagName("payment-type"); cmd.IsSet(flag) {
+		enumID, ok := PaymentType_value[cmd.String(flag)]
+		if !ok {
+			return nil, fmt.Errorf("invalid value for enum field %s", "PaymentType")
+		}
+		value := PaymentType(enumID)
+		result.PaymentType = value
+	}
+	return &result, nil
+}
+
+// UnmarshalCliFlagsToUpdateCartRequest unmarshals a UpdateCartRequest from command line flags
+func UnmarshalCliFlagsToUpdateCartRequest(cmd *v2.Context, options ...helpers.UnmarshalCliFlagsOptions) (*UpdateCartRequest, error) {
+	var result UpdateCartRequest
+	if cmd.IsSet("input-file") {
+		inputFile, err := gohomedir.Expand(cmd.String("input-file"))
+		if err != nil {
+			inputFile = cmd.String("input-file")
+		}
+		b, err := os.ReadFile(inputFile)
+		if err != nil {
+			return nil, fmt.Errorf("error reading input-file: %w", err)
+		}
+		if err := protojson.Unmarshal(b, &result); err != nil {
+			return nil, fmt.Errorf("error parsing input-file json: %w", err)
+		}
+	}
+	opts := helpers.UnmarshalCliFlagsOptions{}
+	if len(options) > 0 {
+		opts = options[0]
+	}
+	if flag := opts.FlagName("products"); cmd.IsSet(flag) {
+		value, err := convert.MapSliceFunc(cmd.StringSlice(flag), func(v string) (*Product, error) {
+			var tmp Product
+			if err := protojson.Unmarshal([]byte(v), &tmp); err != nil {
+				return nil, fmt.Errorf("error unmarshalling \"products\" flag: %w", err)
+			}
+			return &tmp, nil
+		})
+		if err != nil {
+			return nil, err
+		}
+		result.Products = value
+	}
+	return &result, nil
+}
+
+// UnmarshalCliFlagsToUpdateProfileRequest unmarshals a UpdateProfileRequest from command line flags
+func UnmarshalCliFlagsToUpdateProfileRequest(cmd *v2.Context, options ...helpers.UnmarshalCliFlagsOptions) (*UpdateProfileRequest, error) {
+	var result UpdateProfileRequest
 	if cmd.IsSet("input-file") {
 		inputFile, err := gohomedir.Expand(cmd.String("input-file"))
 		if err != nil {
@@ -1593,9 +2847,9 @@ func UnmarshalCliFlagsToUpdateRequest(cmd *v2.Context, options ...helpers.Unmars
 	return &result, nil
 }
 
-// UnmarshalCliFlagsToCreateRequest unmarshals a CreateRequest from command line flags
-func UnmarshalCliFlagsToCreateRequest(cmd *v2.Context, options ...helpers.UnmarshalCliFlagsOptions) (*CreateRequest, error) {
-	var result CreateRequest
+// UnmarshalCliFlagsToCustomerFlowRequest unmarshals a CustomerFlowRequest from command line flags
+func UnmarshalCliFlagsToCustomerFlowRequest(cmd *v2.Context, options ...helpers.UnmarshalCliFlagsOptions) (*CustomerFlowRequest, error) {
+	var result CustomerFlowRequest
 	if cmd.IsSet("input-file") {
 		inputFile, err := gohomedir.Expand(cmd.String("input-file"))
 		if err != nil {

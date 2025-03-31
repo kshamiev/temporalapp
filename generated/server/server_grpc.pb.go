@@ -21,20 +21,45 @@ import (
 const _ = grpc.SupportPackageIsVersion7
 
 const (
-	Customer_Create_FullMethodName = "/server.Customer/Create"
-	Customer_Read_FullMethodName   = "/server.Customer/Read"
-	Customer_Update_FullMethodName = "/server.Customer/Update"
-	Customer_Delete_FullMethodName = "/server.Customer/Delete"
+	Customer_NewCustomer_FullMethodName   = "/server.Customer/NewCustomer"
+	Customer_GetProfile_FullMethodName    = "/server.Customer/GetProfile"
+	Customer_UpdateProfile_FullMethodName = "/server.Customer/UpdateProfile"
+	Customer_DeleteProfile_FullMethodName = "/server.Customer/DeleteProfile"
+	Customer_SetAddress_FullMethodName    = "/server.Customer/SetAddress"
+	Customer_GetCart_FullMethodName       = "/server.Customer/GetCart"
+	Customer_UpdateCart_FullMethodName    = "/server.Customer/UpdateCart"
+	Customer_DeleteCart_FullMethodName    = "/server.Customer/DeleteCart"
+	Customer_GetOrder_FullMethodName      = "/server.Customer/GetOrder"
+	Customer_GetOrders_FullMethodName     = "/server.Customer/GetOrders"
+	Customer_Checkout_FullMethodName      = "/server.Customer/Checkout"
 )
 
 // CustomerClient is the client API for Customer service.
 //
 // For semantics around ctx use and closing/ending streaming RPCs, please refer to https://pkg.go.dev/google.golang.org/grpc/?tab=doc#ClientConn.NewStream.
 type CustomerClient interface {
-	Create(ctx context.Context, in *temporal.CreateRequest, opts ...grpc.CallOption) (*temporal.Profile, error)
-	Read(ctx context.Context, in *ReadRequest, opts ...grpc.CallOption) (*temporal.Profile, error)
-	Update(ctx context.Context, in *UpdateRequest, opts ...grpc.CallOption) (*temporal.Profile, error)
-	Delete(ctx context.Context, in *DeleteRequest, opts ...grpc.CallOption) (*emptypb.Empty, error)
+	// Здесь мы начинаем жизненный цикл пользователя
+	NewCustomer(ctx context.Context, in *NewCustomerRequest, opts ...grpc.CallOption) (*temporal.Profile, error)
+	// Получить профиль пользователя
+	GetProfile(ctx context.Context, in *GetProfileRequest, opts ...grpc.CallOption) (*temporal.Profile, error)
+	// Обновить профиль пользователя
+	UpdateProfile(ctx context.Context, in *UpdateProfileRequest, opts ...grpc.CallOption) (*temporal.Profile, error)
+	// Удалить профиль пользователя
+	DeleteProfile(ctx context.Context, in *DeleteProfileRequest, opts ...grpc.CallOption) (*emptypb.Empty, error)
+	// Задать юзеру адрес
+	SetAddress(ctx context.Context, in *SetAddressRequest, opts ...grpc.CallOption) (*emptypb.Empty, error)
+	// Получить корзину пользователя
+	GetCart(ctx context.Context, in *GetCartRequest, opts ...grpc.CallOption) (*temporal.Cart, error)
+	// Обновить корзина пользователя целиком
+	UpdateCart(ctx context.Context, in *UpdateCartRequest, opts ...grpc.CallOption) (*temporal.Cart, error)
+	// Очистить корзину пользователя
+	DeleteCart(ctx context.Context, in *DeleteCartRequest, opts ...grpc.CallOption) (*emptypb.Empty, error)
+	// Получить заказ пользователя
+	GetOrder(ctx context.Context, in *GetOrderRequest, opts ...grpc.CallOption) (*temporal.Order, error)
+	// Получить все заказы пользователя
+	GetOrders(ctx context.Context, in *GetOrdersRequest, opts ...grpc.CallOption) (*GetOrdersResponse, error)
+	// Создать заказ
+	Checkout(ctx context.Context, in *CheckoutRequest, opts ...grpc.CallOption) (*temporal.Order, error)
 }
 
 type customerClient struct {
@@ -45,36 +70,99 @@ func NewCustomerClient(cc grpc.ClientConnInterface) CustomerClient {
 	return &customerClient{cc}
 }
 
-func (c *customerClient) Create(ctx context.Context, in *temporal.CreateRequest, opts ...grpc.CallOption) (*temporal.Profile, error) {
+func (c *customerClient) NewCustomer(ctx context.Context, in *NewCustomerRequest, opts ...grpc.CallOption) (*temporal.Profile, error) {
 	out := new(temporal.Profile)
-	err := c.cc.Invoke(ctx, Customer_Create_FullMethodName, in, out, opts...)
+	err := c.cc.Invoke(ctx, Customer_NewCustomer_FullMethodName, in, out, opts...)
 	if err != nil {
 		return nil, err
 	}
 	return out, nil
 }
 
-func (c *customerClient) Read(ctx context.Context, in *ReadRequest, opts ...grpc.CallOption) (*temporal.Profile, error) {
+func (c *customerClient) GetProfile(ctx context.Context, in *GetProfileRequest, opts ...grpc.CallOption) (*temporal.Profile, error) {
 	out := new(temporal.Profile)
-	err := c.cc.Invoke(ctx, Customer_Read_FullMethodName, in, out, opts...)
+	err := c.cc.Invoke(ctx, Customer_GetProfile_FullMethodName, in, out, opts...)
 	if err != nil {
 		return nil, err
 	}
 	return out, nil
 }
 
-func (c *customerClient) Update(ctx context.Context, in *UpdateRequest, opts ...grpc.CallOption) (*temporal.Profile, error) {
+func (c *customerClient) UpdateProfile(ctx context.Context, in *UpdateProfileRequest, opts ...grpc.CallOption) (*temporal.Profile, error) {
 	out := new(temporal.Profile)
-	err := c.cc.Invoke(ctx, Customer_Update_FullMethodName, in, out, opts...)
+	err := c.cc.Invoke(ctx, Customer_UpdateProfile_FullMethodName, in, out, opts...)
 	if err != nil {
 		return nil, err
 	}
 	return out, nil
 }
 
-func (c *customerClient) Delete(ctx context.Context, in *DeleteRequest, opts ...grpc.CallOption) (*emptypb.Empty, error) {
+func (c *customerClient) DeleteProfile(ctx context.Context, in *DeleteProfileRequest, opts ...grpc.CallOption) (*emptypb.Empty, error) {
 	out := new(emptypb.Empty)
-	err := c.cc.Invoke(ctx, Customer_Delete_FullMethodName, in, out, opts...)
+	err := c.cc.Invoke(ctx, Customer_DeleteProfile_FullMethodName, in, out, opts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *customerClient) SetAddress(ctx context.Context, in *SetAddressRequest, opts ...grpc.CallOption) (*emptypb.Empty, error) {
+	out := new(emptypb.Empty)
+	err := c.cc.Invoke(ctx, Customer_SetAddress_FullMethodName, in, out, opts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *customerClient) GetCart(ctx context.Context, in *GetCartRequest, opts ...grpc.CallOption) (*temporal.Cart, error) {
+	out := new(temporal.Cart)
+	err := c.cc.Invoke(ctx, Customer_GetCart_FullMethodName, in, out, opts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *customerClient) UpdateCart(ctx context.Context, in *UpdateCartRequest, opts ...grpc.CallOption) (*temporal.Cart, error) {
+	out := new(temporal.Cart)
+	err := c.cc.Invoke(ctx, Customer_UpdateCart_FullMethodName, in, out, opts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *customerClient) DeleteCart(ctx context.Context, in *DeleteCartRequest, opts ...grpc.CallOption) (*emptypb.Empty, error) {
+	out := new(emptypb.Empty)
+	err := c.cc.Invoke(ctx, Customer_DeleteCart_FullMethodName, in, out, opts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *customerClient) GetOrder(ctx context.Context, in *GetOrderRequest, opts ...grpc.CallOption) (*temporal.Order, error) {
+	out := new(temporal.Order)
+	err := c.cc.Invoke(ctx, Customer_GetOrder_FullMethodName, in, out, opts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *customerClient) GetOrders(ctx context.Context, in *GetOrdersRequest, opts ...grpc.CallOption) (*GetOrdersResponse, error) {
+	out := new(GetOrdersResponse)
+	err := c.cc.Invoke(ctx, Customer_GetOrders_FullMethodName, in, out, opts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *customerClient) Checkout(ctx context.Context, in *CheckoutRequest, opts ...grpc.CallOption) (*temporal.Order, error) {
+	out := new(temporal.Order)
+	err := c.cc.Invoke(ctx, Customer_Checkout_FullMethodName, in, out, opts...)
 	if err != nil {
 		return nil, err
 	}
@@ -85,10 +173,28 @@ func (c *customerClient) Delete(ctx context.Context, in *DeleteRequest, opts ...
 // All implementations must embed UnimplementedCustomerServer
 // for forward compatibility
 type CustomerServer interface {
-	Create(context.Context, *temporal.CreateRequest) (*temporal.Profile, error)
-	Read(context.Context, *ReadRequest) (*temporal.Profile, error)
-	Update(context.Context, *UpdateRequest) (*temporal.Profile, error)
-	Delete(context.Context, *DeleteRequest) (*emptypb.Empty, error)
+	// Здесь мы начинаем жизненный цикл пользователя
+	NewCustomer(context.Context, *NewCustomerRequest) (*temporal.Profile, error)
+	// Получить профиль пользователя
+	GetProfile(context.Context, *GetProfileRequest) (*temporal.Profile, error)
+	// Обновить профиль пользователя
+	UpdateProfile(context.Context, *UpdateProfileRequest) (*temporal.Profile, error)
+	// Удалить профиль пользователя
+	DeleteProfile(context.Context, *DeleteProfileRequest) (*emptypb.Empty, error)
+	// Задать юзеру адрес
+	SetAddress(context.Context, *SetAddressRequest) (*emptypb.Empty, error)
+	// Получить корзину пользователя
+	GetCart(context.Context, *GetCartRequest) (*temporal.Cart, error)
+	// Обновить корзина пользователя целиком
+	UpdateCart(context.Context, *UpdateCartRequest) (*temporal.Cart, error)
+	// Очистить корзину пользователя
+	DeleteCart(context.Context, *DeleteCartRequest) (*emptypb.Empty, error)
+	// Получить заказ пользователя
+	GetOrder(context.Context, *GetOrderRequest) (*temporal.Order, error)
+	// Получить все заказы пользователя
+	GetOrders(context.Context, *GetOrdersRequest) (*GetOrdersResponse, error)
+	// Создать заказ
+	Checkout(context.Context, *CheckoutRequest) (*temporal.Order, error)
 	mustEmbedUnimplementedCustomerServer()
 }
 
@@ -96,17 +202,38 @@ type CustomerServer interface {
 type UnimplementedCustomerServer struct {
 }
 
-func (UnimplementedCustomerServer) Create(context.Context, *temporal.CreateRequest) (*temporal.Profile, error) {
-	return nil, status.Errorf(codes.Unimplemented, "method Create not implemented")
+func (UnimplementedCustomerServer) NewCustomer(context.Context, *NewCustomerRequest) (*temporal.Profile, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method NewCustomer not implemented")
 }
-func (UnimplementedCustomerServer) Read(context.Context, *ReadRequest) (*temporal.Profile, error) {
-	return nil, status.Errorf(codes.Unimplemented, "method Read not implemented")
+func (UnimplementedCustomerServer) GetProfile(context.Context, *GetProfileRequest) (*temporal.Profile, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method GetProfile not implemented")
 }
-func (UnimplementedCustomerServer) Update(context.Context, *UpdateRequest) (*temporal.Profile, error) {
-	return nil, status.Errorf(codes.Unimplemented, "method Update not implemented")
+func (UnimplementedCustomerServer) UpdateProfile(context.Context, *UpdateProfileRequest) (*temporal.Profile, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method UpdateProfile not implemented")
 }
-func (UnimplementedCustomerServer) Delete(context.Context, *DeleteRequest) (*emptypb.Empty, error) {
-	return nil, status.Errorf(codes.Unimplemented, "method Delete not implemented")
+func (UnimplementedCustomerServer) DeleteProfile(context.Context, *DeleteProfileRequest) (*emptypb.Empty, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method DeleteProfile not implemented")
+}
+func (UnimplementedCustomerServer) SetAddress(context.Context, *SetAddressRequest) (*emptypb.Empty, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method SetAddress not implemented")
+}
+func (UnimplementedCustomerServer) GetCart(context.Context, *GetCartRequest) (*temporal.Cart, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method GetCart not implemented")
+}
+func (UnimplementedCustomerServer) UpdateCart(context.Context, *UpdateCartRequest) (*temporal.Cart, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method UpdateCart not implemented")
+}
+func (UnimplementedCustomerServer) DeleteCart(context.Context, *DeleteCartRequest) (*emptypb.Empty, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method DeleteCart not implemented")
+}
+func (UnimplementedCustomerServer) GetOrder(context.Context, *GetOrderRequest) (*temporal.Order, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method GetOrder not implemented")
+}
+func (UnimplementedCustomerServer) GetOrders(context.Context, *GetOrdersRequest) (*GetOrdersResponse, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method GetOrders not implemented")
+}
+func (UnimplementedCustomerServer) Checkout(context.Context, *CheckoutRequest) (*temporal.Order, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method Checkout not implemented")
 }
 func (UnimplementedCustomerServer) mustEmbedUnimplementedCustomerServer() {}
 
@@ -121,74 +248,200 @@ func RegisterCustomerServer(s grpc.ServiceRegistrar, srv CustomerServer) {
 	s.RegisterService(&Customer_ServiceDesc, srv)
 }
 
-func _Customer_Create_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
-	in := new(temporal.CreateRequest)
+func _Customer_NewCustomer_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(NewCustomerRequest)
 	if err := dec(in); err != nil {
 		return nil, err
 	}
 	if interceptor == nil {
-		return srv.(CustomerServer).Create(ctx, in)
+		return srv.(CustomerServer).NewCustomer(ctx, in)
 	}
 	info := &grpc.UnaryServerInfo{
 		Server:     srv,
-		FullMethod: Customer_Create_FullMethodName,
+		FullMethod: Customer_NewCustomer_FullMethodName,
 	}
 	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
-		return srv.(CustomerServer).Create(ctx, req.(*temporal.CreateRequest))
+		return srv.(CustomerServer).NewCustomer(ctx, req.(*NewCustomerRequest))
 	}
 	return interceptor(ctx, in, info, handler)
 }
 
-func _Customer_Read_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
-	in := new(ReadRequest)
+func _Customer_GetProfile_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(GetProfileRequest)
 	if err := dec(in); err != nil {
 		return nil, err
 	}
 	if interceptor == nil {
-		return srv.(CustomerServer).Read(ctx, in)
+		return srv.(CustomerServer).GetProfile(ctx, in)
 	}
 	info := &grpc.UnaryServerInfo{
 		Server:     srv,
-		FullMethod: Customer_Read_FullMethodName,
+		FullMethod: Customer_GetProfile_FullMethodName,
 	}
 	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
-		return srv.(CustomerServer).Read(ctx, req.(*ReadRequest))
+		return srv.(CustomerServer).GetProfile(ctx, req.(*GetProfileRequest))
 	}
 	return interceptor(ctx, in, info, handler)
 }
 
-func _Customer_Update_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
-	in := new(UpdateRequest)
+func _Customer_UpdateProfile_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(UpdateProfileRequest)
 	if err := dec(in); err != nil {
 		return nil, err
 	}
 	if interceptor == nil {
-		return srv.(CustomerServer).Update(ctx, in)
+		return srv.(CustomerServer).UpdateProfile(ctx, in)
 	}
 	info := &grpc.UnaryServerInfo{
 		Server:     srv,
-		FullMethod: Customer_Update_FullMethodName,
+		FullMethod: Customer_UpdateProfile_FullMethodName,
 	}
 	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
-		return srv.(CustomerServer).Update(ctx, req.(*UpdateRequest))
+		return srv.(CustomerServer).UpdateProfile(ctx, req.(*UpdateProfileRequest))
 	}
 	return interceptor(ctx, in, info, handler)
 }
 
-func _Customer_Delete_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
-	in := new(DeleteRequest)
+func _Customer_DeleteProfile_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(DeleteProfileRequest)
 	if err := dec(in); err != nil {
 		return nil, err
 	}
 	if interceptor == nil {
-		return srv.(CustomerServer).Delete(ctx, in)
+		return srv.(CustomerServer).DeleteProfile(ctx, in)
 	}
 	info := &grpc.UnaryServerInfo{
 		Server:     srv,
-		FullMethod: Customer_Delete_FullMethodName,
+		FullMethod: Customer_DeleteProfile_FullMethodName,
 	}
 	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
-		return srv.(CustomerServer).Delete(ctx, req.(*DeleteRequest))
+		return srv.(CustomerServer).DeleteProfile(ctx, req.(*DeleteProfileRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _Customer_SetAddress_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(SetAddressRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(CustomerServer).SetAddress(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: Customer_SetAddress_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(CustomerServer).SetAddress(ctx, req.(*SetAddressRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _Customer_GetCart_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(GetCartRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(CustomerServer).GetCart(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: Customer_GetCart_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(CustomerServer).GetCart(ctx, req.(*GetCartRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _Customer_UpdateCart_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(UpdateCartRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(CustomerServer).UpdateCart(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: Customer_UpdateCart_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(CustomerServer).UpdateCart(ctx, req.(*UpdateCartRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _Customer_DeleteCart_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(DeleteCartRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(CustomerServer).DeleteCart(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: Customer_DeleteCart_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(CustomerServer).DeleteCart(ctx, req.(*DeleteCartRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _Customer_GetOrder_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(GetOrderRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(CustomerServer).GetOrder(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: Customer_GetOrder_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(CustomerServer).GetOrder(ctx, req.(*GetOrderRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _Customer_GetOrders_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(GetOrdersRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(CustomerServer).GetOrders(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: Customer_GetOrders_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(CustomerServer).GetOrders(ctx, req.(*GetOrdersRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _Customer_Checkout_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(CheckoutRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(CustomerServer).Checkout(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: Customer_Checkout_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(CustomerServer).Checkout(ctx, req.(*CheckoutRequest))
 	}
 	return interceptor(ctx, in, info, handler)
 }
@@ -201,20 +454,48 @@ var Customer_ServiceDesc = grpc.ServiceDesc{
 	HandlerType: (*CustomerServer)(nil),
 	Methods: []grpc.MethodDesc{
 		{
-			MethodName: "Create",
-			Handler:    _Customer_Create_Handler,
+			MethodName: "NewCustomer",
+			Handler:    _Customer_NewCustomer_Handler,
 		},
 		{
-			MethodName: "Read",
-			Handler:    _Customer_Read_Handler,
+			MethodName: "GetProfile",
+			Handler:    _Customer_GetProfile_Handler,
 		},
 		{
-			MethodName: "Update",
-			Handler:    _Customer_Update_Handler,
+			MethodName: "UpdateProfile",
+			Handler:    _Customer_UpdateProfile_Handler,
 		},
 		{
-			MethodName: "Delete",
-			Handler:    _Customer_Delete_Handler,
+			MethodName: "DeleteProfile",
+			Handler:    _Customer_DeleteProfile_Handler,
+		},
+		{
+			MethodName: "SetAddress",
+			Handler:    _Customer_SetAddress_Handler,
+		},
+		{
+			MethodName: "GetCart",
+			Handler:    _Customer_GetCart_Handler,
+		},
+		{
+			MethodName: "UpdateCart",
+			Handler:    _Customer_UpdateCart_Handler,
+		},
+		{
+			MethodName: "DeleteCart",
+			Handler:    _Customer_DeleteCart_Handler,
+		},
+		{
+			MethodName: "GetOrder",
+			Handler:    _Customer_GetOrder_Handler,
+		},
+		{
+			MethodName: "GetOrders",
+			Handler:    _Customer_GetOrders_Handler,
+		},
+		{
+			MethodName: "Checkout",
+			Handler:    _Customer_Checkout_Handler,
 		},
 	},
 	Streams:  []grpc.StreamDesc{},

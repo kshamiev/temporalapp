@@ -9,9 +9,7 @@ h:
 	@echo "Usage: make [target]"
 	@echo "  target is:"
 	@echo "                     dep	- Обновление зависимостей"
-	@echo "     temporal-dev-server	- Запуск сервера temporal"
-	@echo "                  worker - Регистрация и режим работы workflow"
-	@echo "                   start - Команда для запуска нового экземпляра workflow"
+	@echo "                   start - Запустить всё и сразу"
 .PHONY: h
 help: h
 .PHONY: help
@@ -61,3 +59,8 @@ worker:
 server:
 	go run server/main.go
 .PHONY: server
+
+# make -j start
+start: temporal-dev-server worker server
+.PHONY: start
+

@@ -1,5 +1,5 @@
 ### Запустить жизненный цикл пользователя
-GRPC localhost:50051/server.Customer/Create
+GRPC localhost:50051/server.Customer/NewCustomer
 
 {
   "name": "Джо Персиков",
@@ -15,24 +15,56 @@ GRPC localhost:50051/server.Customer/Create
     });
 %}
 
+### Указать адрес пользователя
+GRPC localhost:50051/server.Customer/SetAddress
+
+{
+  "customerId": "{{ customerId }}",
+  "title": "Улица Пушкина, Дом Колотушкина",
+  "lat": "59.93863",
+  "long": "30.31413"
+}
+
 ### Получить профиль
-GRPC localhost:50051/server.Customer/Read
+GRPC localhost:50051/server.Customer/GetProfile
 
 {
   "id": "{{ customerId }}"
 }
 
-### Обновить профиль
-GRPC localhost:50051/server.Customer/Update
+### Обновить корзину
+GRPC localhost:50051/server.Customer/UpdateCart
 
 {
-  "id": "{{ customerId }}",
-  "name": "Джон Ананасов"
+  "customerId": "{{ customerId }}",
+  "products": [{
+      "id": "E76A2F4B-E6B9-467E-B07A-C71A0A309D8F",
+      "name": "Желейные мишки",
+      "price": 150,
+      "inn": "7709403651",
+      "qty": 5
+  }]
 }
 
-### Удалить профиль
-GRPC localhost:50051/server.Customer/Delete
+### Получить корзину
+GRPC localhost:50051/server.Customer/GetCart
 
 {
-  "id": "{{ customerId }}"
+  "customerId": "{{ customerId }}"
 }
+
+### Создать заказ
+GRPC localhost:50051/server.Customer/Checkout
+
+{
+  "customerId": "{{ customerId }}",
+  "paymentType": 0
+}
+
+> {%
+    client.test("Checkout executed successfully", function() {
+        client.assert(response.status === 207, `Status is ${response.status}`);
+        client.assert(response.body.hasOwnProperty("id"), "Response does not contain identifier");
+        client.assert(response.body.id.length > 0, "id is empty");
+    });
+%}
