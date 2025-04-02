@@ -22,13 +22,25 @@ func main() {
 		TaskQueue: "hello",
 	}
 
-	we, err := c.ExecuteWorkflow(context.Background(), workflowOptions, listworkflow.Workflow, "Temporal")
+	we, err := c.ExecuteWorkflow(context.Background(), workflowOptions, listworkflow.WorkflowOne, "Temporal1")
+	if err != nil {
+		log.Fatalln("Unable to execute workflow", err)
+	}
+	log.Println("Started workflow", "WorkflowID", we.GetID(), "RunID", we.GetRunID())
+	err = we.Get(context.Background(), nil)
 	if err != nil {
 		log.Fatalln("Unable to execute workflow", err)
 	}
 
+	we, err = c.ExecuteWorkflow(context.Background(), workflowOptions, listworkflow.WorkflowTwo, "Temporal2")
+	if err != nil {
+		log.Fatalln("Unable to execute workflow", err)
+	}
 	log.Println("Started workflow", "WorkflowID", we.GetID(), "RunID", we.GetRunID())
-
 	err = we.Get(context.Background(), nil)
-	log.Println("Workflow completed")
+	if err != nil {
+		log.Fatalln("Unable to execute workflow", err)
+	}
+
+	log.Println("Workflows completed")
 }

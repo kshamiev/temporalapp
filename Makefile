@@ -28,7 +28,6 @@ temporal-dev-server:
 	temporal server start-dev \
       --dynamic-config-value "frontend.enableUpdateWorkflowExecution=true" \
       --dynamic-config-value "frontend.enableUpdateWorkflowExecutionAsyncAccepted=true" \
-      --db-filename data/temporal.txt \
       --ui-port 8080
 .PHONY: temporal-dev-server
 
@@ -36,6 +35,10 @@ worker:
 	go run worker/main.go
 .PHONY: worker
 
-start:
+server:
 	go run starter/main.go
+.PHONY: server
+
+# make -j start
+start: temporal-dev-server worker server
 .PHONY: start
