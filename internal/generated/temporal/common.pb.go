@@ -9,6 +9,7 @@ package temporal
 import (
 	protoreflect "google.golang.org/protobuf/reflect/protoreflect"
 	protoimpl "google.golang.org/protobuf/runtime/protoimpl"
+	timestamppb "google.golang.org/protobuf/types/known/timestamppb"
 	reflect "reflect"
 	sync "sync"
 	unsafe "unsafe"
@@ -257,6 +258,7 @@ type Cart struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
 	Products      []*Product             `protobuf:"bytes,1,rep,name=products,proto3" json:"products,omitempty"`
 	Total         int32                  `protobuf:"varint,2,opt,name=total,proto3" json:"total,omitempty"`
+	Id            string                 `protobuf:"bytes,3,opt,name=id,proto3" json:"id,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -305,12 +307,21 @@ func (x *Cart) GetTotal() int32 {
 	return 0
 }
 
+func (x *Cart) GetId() string {
+	if x != nil {
+		return x.Id
+	}
+	return ""
+}
+
 type Order struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
 	Id            string                 `protobuf:"bytes,1,opt,name=id,proto3" json:"id,omitempty"`
 	Customer      *Profile               `protobuf:"bytes,2,opt,name=customer,proto3" json:"customer,omitempty"`
 	Cart          *Cart                  `protobuf:"bytes,3,opt,name=cart,proto3" json:"cart,omitempty"`
 	PaymentType   PaymentType            `protobuf:"varint,4,opt,name=paymentType,proto3,enum=temporal.PaymentType" json:"paymentType,omitempty"`
+	CreatedAt     *timestamppb.Timestamp `protobuf:"bytes,5,opt,name=createdAt,proto3" json:"createdAt,omitempty"`
+	UpdatedAt     *timestamppb.Timestamp `protobuf:"bytes,6,opt,name=updatedAt,proto3" json:"updatedAt,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -371,6 +382,20 @@ func (x *Order) GetPaymentType() PaymentType {
 		return x.PaymentType
 	}
 	return PaymentType_CASH
+}
+
+func (x *Order) GetCreatedAt() *timestamppb.Timestamp {
+	if x != nil {
+		return x.CreatedAt
+	}
+	return nil
+}
+
+func (x *Order) GetUpdatedAt() *timestamppb.Timestamp {
+	if x != nil {
+		return x.UpdatedAt
+	}
+	return nil
 }
 
 type Profile struct {
@@ -505,21 +530,24 @@ var File_common_proto protoreflect.FileDescriptor
 
 const file_common_proto_rawDesc = "" +
 	"\n" +
-	"\fcommon.proto\x12\btemporal\"g\n" +
+	"\fcommon.proto\x12\btemporal\x1a\x1fgoogle/protobuf/timestamp.proto\"g\n" +
 	"\aProduct\x12\x0e\n" +
 	"\x02id\x18\x01 \x01(\tR\x02id\x12\x12\n" +
 	"\x04name\x18\x02 \x01(\tR\x04name\x12\x14\n" +
 	"\x05price\x18\x03 \x01(\x05R\x05price\x12\x10\n" +
 	"\x03inn\x18\x04 \x01(\tR\x03inn\x12\x10\n" +
-	"\x03qty\x18\x05 \x01(\x05R\x03qty\"K\n" +
+	"\x03qty\x18\x05 \x01(\x05R\x03qty\"[\n" +
 	"\x04Cart\x12-\n" +
 	"\bproducts\x18\x01 \x03(\v2\x11.temporal.ProductR\bproducts\x12\x14\n" +
-	"\x05total\x18\x02 \x01(\x05R\x05total\"\xa3\x01\n" +
+	"\x05total\x18\x02 \x01(\x05R\x05total\x12\x0e\n" +
+	"\x02id\x18\x03 \x01(\tR\x02id\"\x97\x02\n" +
 	"\x05Order\x12\x0e\n" +
 	"\x02id\x18\x01 \x01(\tR\x02id\x12-\n" +
 	"\bcustomer\x18\x02 \x01(\v2\x11.temporal.ProfileR\bcustomer\x12\"\n" +
 	"\x04cart\x18\x03 \x01(\v2\x0e.temporal.CartR\x04cart\x127\n" +
-	"\vpaymentType\x18\x04 \x01(\x0e2\x15.temporal.PaymentTypeR\vpaymentType\"p\n" +
+	"\vpaymentType\x18\x04 \x01(\x0e2\x15.temporal.PaymentTypeR\vpaymentType\x128\n" +
+	"\tcreatedAt\x18\x05 \x01(\v2\x1a.google.protobuf.TimestampR\tcreatedAt\x128\n" +
+	"\tupdatedAt\x18\x06 \x01(\v2\x1a.google.protobuf.TimestampR\tupdatedAt\"p\n" +
 	"\aProfile\x12\x0e\n" +
 	"\x02id\x18\x01 \x01(\tR\x02id\x12\x12\n" +
 	"\x04name\x18\x02 \x01(\tR\x04name\x12\x14\n" +
@@ -561,26 +589,29 @@ func file_common_proto_rawDescGZIP() []byte {
 var file_common_proto_enumTypes = make([]protoimpl.EnumInfo, 3)
 var file_common_proto_msgTypes = make([]protoimpl.MessageInfo, 5)
 var file_common_proto_goTypes = []any{
-	(PaymentType)(0),       // 0: temporal.PaymentType
-	(PaymentStatus)(0),     // 1: temporal.PaymentStatus
-	(VendorOrderStatus)(0), // 2: temporal.VendorOrderStatus
-	(*Product)(nil),        // 3: temporal.Product
-	(*Cart)(nil),           // 4: temporal.Cart
-	(*Order)(nil),          // 5: temporal.Order
-	(*Profile)(nil),        // 6: temporal.Profile
-	(*Address)(nil),        // 7: temporal.Address
+	(PaymentType)(0),              // 0: temporal.PaymentType
+	(PaymentStatus)(0),            // 1: temporal.PaymentStatus
+	(VendorOrderStatus)(0),        // 2: temporal.VendorOrderStatus
+	(*Product)(nil),               // 3: temporal.Product
+	(*Cart)(nil),                  // 4: temporal.Cart
+	(*Order)(nil),                 // 5: temporal.Order
+	(*Profile)(nil),               // 6: temporal.Profile
+	(*Address)(nil),               // 7: temporal.Address
+	(*timestamppb.Timestamp)(nil), // 8: google.protobuf.Timestamp
 }
 var file_common_proto_depIdxs = []int32{
 	3, // 0: temporal.Cart.products:type_name -> temporal.Product
 	6, // 1: temporal.Order.customer:type_name -> temporal.Profile
 	4, // 2: temporal.Order.cart:type_name -> temporal.Cart
 	0, // 3: temporal.Order.paymentType:type_name -> temporal.PaymentType
-	7, // 4: temporal.Profile.address:type_name -> temporal.Address
-	5, // [5:5] is the sub-list for method output_type
-	5, // [5:5] is the sub-list for method input_type
-	5, // [5:5] is the sub-list for extension type_name
-	5, // [5:5] is the sub-list for extension extendee
-	0, // [0:5] is the sub-list for field type_name
+	8, // 4: temporal.Order.createdAt:type_name -> google.protobuf.Timestamp
+	8, // 5: temporal.Order.updatedAt:type_name -> google.protobuf.Timestamp
+	7, // 6: temporal.Profile.address:type_name -> temporal.Address
+	7, // [7:7] is the sub-list for method output_type
+	7, // [7:7] is the sub-list for method input_type
+	7, // [7:7] is the sub-list for extension type_name
+	7, // [7:7] is the sub-list for extension extendee
+	0, // [0:7] is the sub-list for field type_name
 }
 
 func init() { file_common_proto_init() }
