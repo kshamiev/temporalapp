@@ -1,28 +1,31 @@
-# Инициализация
-export DIR := $(realpath .)
+export PROTOC_GEN_GO_TEMPORAL_VERSION=v1.14.3
 export TEMPORAL_DEBUG=true
 
-default: help
-
-# Help
-h:
-	@echo "Usage: make [target]"
-	@echo "  target is:"
-	@echo "                     dep	- Обновление зависимостей"
-	@echo "     temporal-dev-server	- Запуск сервера temporal"
-	@echo "                  worker - Регистрация и режим работы workflow"
-	@echo "                   start - Команда для запуска нового экземпляра workflow"
-.PHONY: h
-help: h
-.PHONY: help
-
-# Зависимости
 dep:
 	go mod tidy
 	go mod vendor
 .PHONY: dep
 
-##########################################3
+gen-temporal:
+	@protoc \
+     -I ./proto \
+     --go_out=../ \
+     --go_opt=paths=import \
+     --plugin=protoc-gen-go-temporal \
+     --go_temporal_out=../ \
+     --go_temporal_opt="cli-categories=true" \
+     --go_temporal_opt="cli-enabled=true" \
+     --go_temporal_opt="workflow-update-enabled=true" \
+     proto/common.proto proto/processing.proto proto/customer.proto proto/checkout.proto
+.PHONY: gen-temporal
+
+gen-server:
+	@protoc \
+     -I ./proto \
+     --go_out=../ \
+     --go-grpc_out=../ \
+     proto/server.proto
+.PHONY: gen-server
 
 temporal-dev-server:
 	temporal server start-dev \
@@ -32,13 +35,12 @@ temporal-dev-server:
 .PHONY: temporal-dev-server
 
 worker:
-	go run worker/main.go
+	go run cmd/worker/main.go worker
 .PHONY: worker
 
 server:
-	go run starter/main.go
+	go run cmd/server/main.go
 .PHONY: server
 
-# make -j start
-start: temporal-dev-server worker server
-.PHONY: start
+# make -j3 all
+all: temporal-dev-server worker server

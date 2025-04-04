@@ -1,0 +1,67 @@
+### Запустить жизненный цикл пользователя
+GRPC localhost:50051/server.Customer/NewCustomer
+
+{
+  "name": "Джо Персиков",
+  "phone": "79650843636"
+}
+
+> {%
+    client.test("Checkout executed successfully", function() {
+        client.assert(response.status === 207, `Status is ${response.status}`);
+        client.assert(response.body.hasOwnProperty("id"), "Response does not contain identifier");
+        client.assert(response.body.id.length > 0, "id is empty");
+        client.global.set("customerId", response.body.id);
+    });
+%}
+
+### Указать адрес пользователя
+GRPC localhost:50051/server.Customer/SetAddress
+
+{
+  "customerId": "{{ customerId }}",
+  "title": "Улица Пушкина, Дом Колотушкина",
+  "lat": "59.93863",
+  "long": "30.31413"
+}
+
+### Получить профиль
+GRPC localhost:50051/server.Customer/GetProfile
+
+{
+  "id": "{{ customerId }}"
+}
+
+### Обновить корзину
+GRPC localhost:50051/server.Customer/UpdateCart
+
+{
+  "customerId": "{{ customerId }}",
+  "products": [{
+      "id": "E76A2F4B-E6B9-467E-B07A-C71A0A309D8F",
+      "qty": 5
+  }]
+}
+
+### Получить корзину
+GRPC localhost:50051/server.Customer/GetCart
+
+{
+  "customerId": "{{ customerId }}"
+}
+
+### Создать заказ
+GRPC localhost:50051/server.Customer/Checkout
+
+{
+  "customerId": "{{ customerId }}",
+  "paymentType": 1
+}
+
+> {%
+    client.test("Checkout executed successfully", function() {
+        client.assert(response.status === 207, `Status is ${response.status}`);
+        client.assert(response.body.hasOwnProperty("id"), "Response does not contain identifier");
+        client.assert(response.body.id.length > 0, "id is empty");
+    });
+%}
