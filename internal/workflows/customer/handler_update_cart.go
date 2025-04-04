@@ -4,6 +4,7 @@ import (
 	"errors"
 	"fmt"
 
+	"github.com/google/uuid"
 	"go.temporal.io/sdk/workflow"
 
 	"temporalapp/internal/generated/temporal"
@@ -47,37 +48,29 @@ func (w *Workflow) UpdateCart(ctx workflow.Context, request *temporal.UpdateCart
 			Qty:   p.Qty,
 		})
 	}
-	// total := calculateTotal(products)
-	versionID := workflow.GetCurrentUpdateInfo(ctx).ID
-	fmt.Println(versionID)
 
 	w.cart = &temporal.Cart{
-		// Id:       uuid.NewString(),
 		Products: products,
 		Total:    calculateTotal(products),
 	}
 
-	// if w.cart == nil {
-	// 	w.cart = &temporal.Cart{}
-	// }
-	// w.cart.Products = products
-	// w.cart.Total = total
-	// // Если уже идентификатор задан, то скипаем
-	// if w.cart.Id != "" {
-	// 	return w.cart, nil
-	// }
-	// // Берем динамически создание версии
-	// versionID := workflow.GetCurrentUpdateInfo(ctx).ID
-	// fmt.Println(versionID)
-	// v := workflow.GetVersion(ctx, fmt.Sprintf("cartUpdate-%s", versionID), workflow.DefaultVersion, 1)
-	// if v > 0 {
-	// 	encodedValue := workflow.SideEffect(ctx, func(ctx workflow.Context) interface{} {
-	// 		return uuid.NewString()
-	// 	})
-	// 	if err := encodedValue.Get(&w.cart.Id); err != nil {
-	// 		return nil, err
-	// 	}
-	// }
+	// Берем динамически создание версии
+	versionID := workflow.GetCurrentUpdateInfo(ctx).ID
+	v := workflow.GetVersion(ctx, fmt.Sprintf("cartUpdate-%s", versionID), workflow.DefaultVersion, 1)
+	if v > 0 {
+		encodedValue := workflow.SideEffect(ctx, func(ctx workflow.Context) interface{} {
+			return uuid.NewString()
+		})
+		if err := encodedValue.Get(&w.cart.Id); err != nil {
+			return nil, err
+		}
+	}
+	fmt.Println("!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!1")
+	fmt.Println("workflow ID:", workflow.GetInfo(ctx).WorkflowExecution.ID)
+	fmt.Println("workflow instance ID:", workflow.GetInfo(ctx).WorkflowExecution.RunID)
+	fmt.Println("workflow instance method ID:", versionID)
+	fmt.Println("workflow instance method Block Version ID:", v)
+	fmt.Println("!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!1")
 
 	return w.cart, nil
 }
