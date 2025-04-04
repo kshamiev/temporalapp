@@ -57,7 +57,7 @@ func (w *Workflow) UpdateCart(ctx workflow.Context, request *temporal.UpdateCart
 	// Берем динамически создание версии
 	versionID := workflow.GetCurrentUpdateInfo(ctx).ID
 	v := workflow.GetVersion(ctx, fmt.Sprintf("cartUpdate-%s", versionID), workflow.DefaultVersion, 1)
-	if v > 0 {
+	if v != workflow.DefaultVersion {
 		encodedValue := workflow.SideEffect(ctx, func(ctx workflow.Context) interface{} {
 			return uuid.NewString()
 		})
