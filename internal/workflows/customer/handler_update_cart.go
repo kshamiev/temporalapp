@@ -70,7 +70,7 @@ func (w *Workflow) UpdateCart(ctx workflow.Context, request *temporal.UpdateCart
 	fmt.Println("workflow instance ID:", workflow.GetInfo(ctx).WorkflowExecution.RunID)
 	fmt.Println("workflow instance method ID:", versionID)
 	fmt.Println("workflow instance method Block Version ID:", v)
-	fmt.Println("!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!1")
+	fmt.Println()
 
 	return w.cart, nil
 }
