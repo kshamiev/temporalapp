@@ -1,0 +1,59 @@
+linters-settings:
+  gocyclo:
+    min-complexity: 20
+  dupl:
+    threshold: 100
+  goconst:
+    min-len: 2
+    min-occurrences: 2
+  misspell:
+    locale: US
+  lll:
+    line-length: 140
+  goimports:
+    local-prefixes: github.com/golangci/golangci-lint
+  gocritic:
+    enabled-tags:
+      - performance
+      - style
+      - experimental
+    disabled-checks:
+      - wrapperFunc
+
+linters:
+  disable-all: true
+  enable:
+    - gocyclo
+    - dupl
+    - lll
+    - gosec
+    - goconst
+    - misspell
+    - goimports
+    - gocritic
+    - staticcheck
+    - errcheck
+    - unused
+    - gosimple
+    - ineffassign
+    - typecheck
+    - bodyclose
+    - unconvert
+    - unparam
+    - prealloc
+    - whitespace
+
+run:
+  tests: false
+  timeout: 5m
+
+issues:
+  exclude-dirs:
+    - bin
+    - doc
+    - conf
+    - etc
+    - migration
+    - vendor
+    - www
+    - dev

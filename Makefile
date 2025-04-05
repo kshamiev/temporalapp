@@ -6,6 +6,12 @@ dep:
 	go mod vendor
 .PHONY: dep
 
+# Linters
+lint:
+	# golangci-lint cache clean
+	golangci-lint run -c .golangci.yml
+.PHONY: lint
+
 gen-temporal:
 	@protoc \
      -I ./proto \

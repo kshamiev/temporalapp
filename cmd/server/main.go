@@ -51,7 +51,6 @@ func (s *srv) DeleteProfile(ctx context.Context, request *server.DeleteProfileRe
 			evalCustomerWorkflowID(request),
 			"",
 		)
-
 }
 
 func (s *srv) SetAddress(ctx context.Context, request *server.SetAddressRequest) (*emptypb.Empty, error) {
@@ -92,7 +91,6 @@ func (s *srv) DeleteCart(ctx context.Context, request *server.DeleteCartRequest)
 			evalCustomerWorkflowID(request),
 			"",
 		)
-
 }
 
 func (s *srv) GetOrder(ctx context.Context, request *server.GetOrderRequest) (*temporal.Order, error) {

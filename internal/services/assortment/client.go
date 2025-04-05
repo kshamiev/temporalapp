@@ -22,8 +22,8 @@ func (c *Client) GetProducts(ctx context.Context, productIDs []string) ([]*tempo
 		res[i] = &temporal.AssortmentProduct{
 			Id:     productIDs[i],
 			Name:   c.faker.ProductName(),
-			Price:  int32(c.faker.Price(100, 9999)),
-			Stocks: int32(c.faker.IntRange(5, 32)),
+			Price:  int32(c.faker.Price(100, 9999)), // nolint
+			Stocks: int32(c.faker.IntRange(5, 32)),  // nolint
 		}
 	}
 	return res, nil

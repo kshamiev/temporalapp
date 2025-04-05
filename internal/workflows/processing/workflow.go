@@ -51,7 +51,7 @@ func (w *Workflow) Execute(ctx workflow.Context) error {
 	// Другой способ реализации
 	// https://github.com/temporalio/samples-go/blob/main/polling/infrequent/workflow.go#L26
 	for {
-		if err = workflow.Sleep(ctx, time.Minute); err != nil {
+		if err := workflow.Sleep(ctx, time.Minute); err != nil {
 			return err
 		}
 		vendorOrder, err := temporal.GetVendorOrder(ctx, &temporal.VendorOrderRequest{

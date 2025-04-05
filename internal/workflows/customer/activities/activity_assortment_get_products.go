@@ -6,7 +6,11 @@ import (
 	"temporalapp/internal/generated/temporal"
 )
 
-func (a *Activities) AssortmentGetProducts(ctx context.Context, req *temporal.AssortmentGetProductsRequest) (*temporal.AssortmentGetProductsResponse, error) {
+func (a *Activities) AssortmentGetProducts(
+	ctx context.Context, req *temporal.AssortmentGetProductsRequest,
+) (
+	*temporal.AssortmentGetProductsResponse, error,
+) {
 	p, err := a.assortmentClient.GetProducts(ctx, req.GetIds())
 	if err != nil {
 		return nil, err
