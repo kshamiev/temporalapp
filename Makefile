@@ -8,8 +8,8 @@ dep:
 
 # Linters
 lint:
-	# golangci-lint cache clean
 	golangci-lint run -c .golangci.yml
+	workflowcheck ./internal/workflows/...
 .PHONY: lint
 
 gen-temporal:
