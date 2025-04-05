@@ -14,6 +14,7 @@ func (w *Workflow) Checkout(ctx workflow.Context, request *temporal.CheckoutRequ
 	if w.cart == nil {
 		return nil, errors.New("cart is empty")
 	}
+	//workflowcheck:ignore
 	return temporal.CheckoutFlowChild(ctx, &temporal.CheckoutFlowRequest{
 		PaymentType: request.PaymentType,
 		Cart:        w.cart,

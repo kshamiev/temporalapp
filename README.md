@@ -24,3 +24,8 @@ go install google.golang.org/protobuf/cmd/protoc-gen-go@latest
 ```shell
 go install github.com/cludden/protoc-gen-go-temporal/cmd/protoc-gen-go_temporal@latest
 ```
+
+Установите линтер [workflowcheck](https://pkg.go.dev/go.temporal.io/sdk/contrib/tools/workflowcheck#section-readme):
+```shell
+go install go.temporal.io/sdk/contrib/tools/workflowcheck@latest
+```
