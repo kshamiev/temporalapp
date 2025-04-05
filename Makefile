@@ -9,7 +9,7 @@ dep:
 # Linters
 lint:
 	golangci-lint run -c .golangci.yml
-	workflowcheck ./internal/workflows/...
+	workflowcheck -config workflowcheck.config.yaml ./internal/workflows/...
 .PHONY: lint
 
 gen-temporal:

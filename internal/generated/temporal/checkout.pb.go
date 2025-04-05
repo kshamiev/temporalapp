@@ -203,6 +203,50 @@ func (x *CreatePaymentResponse) GetUrl() string {
 	return ""
 }
 
+type PaymentCancelRequest struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Id            string                 `protobuf:"bytes,1,opt,name=id,proto3" json:"id,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *PaymentCancelRequest) Reset() {
+	*x = PaymentCancelRequest{}
+	mi := &file_checkout_proto_msgTypes[3]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *PaymentCancelRequest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*PaymentCancelRequest) ProtoMessage() {}
+
+func (x *PaymentCancelRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_checkout_proto_msgTypes[3]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use PaymentCancelRequest.ProtoReflect.Descriptor instead.
+func (*PaymentCancelRequest) Descriptor() ([]byte, []int) {
+	return file_checkout_proto_rawDescGZIP(), []int{3}
+}
+
+func (x *PaymentCancelRequest) GetId() string {
+	if x != nil {
+		return x.Id
+	}
+	return ""
+}
+
 var File_checkout_proto protoreflect.FileDescriptor
 
 const file_checkout_proto_rawDesc = "" +
@@ -221,11 +265,15 @@ const file_checkout_proto_rawDesc = "" +
 	"\x15CreatePaymentResponse\x12\x0e\n" +
 	"\x02id\x18\x01 \x01(\tR\x02id\x12/\n" +
 	"\x06status\x18\x02 \x01(\x0e2\x17.temporal.PaymentStatusR\x06status\x12\x10\n" +
-	"\x03url\x18\x03 \x01(\tR\x03url2\xc1\x02\n" +
+	"\x03url\x18\x03 \x01(\tR\x03url\"&\n" +
+	"\x14PaymentCancelRequest\x12\x0e\n" +
+	"\x02id\x18\x01 \x01(\tR\x02id2\xfd\x03\n" +
 	"\bCheckout\x12g\n" +
 	"\fCheckoutFlow\x12\x1d.temporal.CheckoutFlowRequest\x1a\x0f.temporal.Order\"'\x8a\xc4\x03#*\x1fcheckout/${! id.or(uuid_v4()) }0\x01\x12]\n" +
-	"\x11AssortmentReserve\x12\".temporal.AssortmentReserveRequest\x1a\x16.google.protobuf.Empty\"\f\x92\xc4\x03\b\"\x02\b\x042\x02 \x03\x12^\n" +
-	"\rCreatePayment\x12\x1e.temporal.CreatePaymentRequest\x1a\x1f.temporal.CreatePaymentResponse\"\f\x92\xc4\x03\b\"\x02\b\x042\x02 \x03\x1a\r\x8a\xc4\x03\t\n" +
+	"\x11AssortmentReserve\x12\".temporal.AssortmentReserveRequest\x1a\x16.google.protobuf.Empty\"\f\x92\xc4\x03\b\"\x02\b\x042\x02 \x03\x12c\n" +
+	"\x17AssortmentReserveCancel\x12\".temporal.AssortmentReserveRequest\x1a\x16.google.protobuf.Empty\"\f\x92\xc4\x03\b\"\x02\b\x042\x02 \x03\x12^\n" +
+	"\rCreatePayment\x12\x1e.temporal.CreatePaymentRequest\x1a\x1f.temporal.CreatePaymentResponse\"\f\x92\xc4\x03\b\"\x02\b\x042\x02 \x03\x12U\n" +
+	"\rPaymentCancel\x12\x1e.temporal.PaymentCancelRequest\x1a\x16.google.protobuf.Empty\"\f\x92\xc4\x03\b\"\x02\b\x042\x02 \x03\x1a\r\x8a\xc4\x03\t\n" +
 	"\ageneralB)Z'temporalapp/internal/generated/temporalb\x06proto3"
 
 var (
@@ -240,35 +288,40 @@ func file_checkout_proto_rawDescGZIP() []byte {
 	return file_checkout_proto_rawDescData
 }
 
-var file_checkout_proto_msgTypes = make([]protoimpl.MessageInfo, 3)
+var file_checkout_proto_msgTypes = make([]protoimpl.MessageInfo, 4)
 var file_checkout_proto_goTypes = []any{
 	(*CheckoutFlowRequest)(nil),      // 0: temporal.CheckoutFlowRequest
 	(*CreatePaymentRequest)(nil),     // 1: temporal.CreatePaymentRequest
 	(*CreatePaymentResponse)(nil),    // 2: temporal.CreatePaymentResponse
-	(*Cart)(nil),                     // 3: temporal.Cart
-	(*Profile)(nil),                  // 4: temporal.Profile
-	(PaymentType)(0),                 // 5: temporal.PaymentType
-	(PaymentStatus)(0),               // 6: temporal.PaymentStatus
-	(*AssortmentReserveRequest)(nil), // 7: temporal.AssortmentReserveRequest
-	(*Order)(nil),                    // 8: temporal.Order
-	(*emptypb.Empty)(nil),            // 9: google.protobuf.Empty
+	(*PaymentCancelRequest)(nil),     // 3: temporal.PaymentCancelRequest
+	(*Cart)(nil),                     // 4: temporal.Cart
+	(*Profile)(nil),                  // 5: temporal.Profile
+	(PaymentType)(0),                 // 6: temporal.PaymentType
+	(PaymentStatus)(0),               // 7: temporal.PaymentStatus
+	(*AssortmentReserveRequest)(nil), // 8: temporal.AssortmentReserveRequest
+	(*Order)(nil),                    // 9: temporal.Order
+	(*emptypb.Empty)(nil),            // 10: google.protobuf.Empty
 }
 var file_checkout_proto_depIdxs = []int32{
-	3, // 0: temporal.CheckoutFlowRequest.cart:type_name -> temporal.Cart
-	4, // 1: temporal.CheckoutFlowRequest.customer:type_name -> temporal.Profile
-	5, // 2: temporal.CheckoutFlowRequest.paymentType:type_name -> temporal.PaymentType
-	6, // 3: temporal.CreatePaymentResponse.status:type_name -> temporal.PaymentStatus
-	0, // 4: temporal.Checkout.CheckoutFlow:input_type -> temporal.CheckoutFlowRequest
-	7, // 5: temporal.Checkout.AssortmentReserve:input_type -> temporal.AssortmentReserveRequest
-	1, // 6: temporal.Checkout.CreatePayment:input_type -> temporal.CreatePaymentRequest
-	8, // 7: temporal.Checkout.CheckoutFlow:output_type -> temporal.Order
-	9, // 8: temporal.Checkout.AssortmentReserve:output_type -> google.protobuf.Empty
-	2, // 9: temporal.Checkout.CreatePayment:output_type -> temporal.CreatePaymentResponse
-	7, // [7:10] is the sub-list for method output_type
-	4, // [4:7] is the sub-list for method input_type
-	4, // [4:4] is the sub-list for extension type_name
-	4, // [4:4] is the sub-list for extension extendee
-	0, // [0:4] is the sub-list for field type_name
+	4,  // 0: temporal.CheckoutFlowRequest.cart:type_name -> temporal.Cart
+	5,  // 1: temporal.CheckoutFlowRequest.customer:type_name -> temporal.Profile
+	6,  // 2: temporal.CheckoutFlowRequest.paymentType:type_name -> temporal.PaymentType
+	7,  // 3: temporal.CreatePaymentResponse.status:type_name -> temporal.PaymentStatus
+	0,  // 4: temporal.Checkout.CheckoutFlow:input_type -> temporal.CheckoutFlowRequest
+	8,  // 5: temporal.Checkout.AssortmentReserve:input_type -> temporal.AssortmentReserveRequest
+	8,  // 6: temporal.Checkout.AssortmentReserveCancel:input_type -> temporal.AssortmentReserveRequest
+	1,  // 7: temporal.Checkout.CreatePayment:input_type -> temporal.CreatePaymentRequest
+	3,  // 8: temporal.Checkout.PaymentCancel:input_type -> temporal.PaymentCancelRequest
+	9,  // 9: temporal.Checkout.CheckoutFlow:output_type -> temporal.Order
+	10, // 10: temporal.Checkout.AssortmentReserve:output_type -> google.protobuf.Empty
+	10, // 11: temporal.Checkout.AssortmentReserveCancel:output_type -> google.protobuf.Empty
+	2,  // 12: temporal.Checkout.CreatePayment:output_type -> temporal.CreatePaymentResponse
+	10, // 13: temporal.Checkout.PaymentCancel:output_type -> google.protobuf.Empty
+	9,  // [9:14] is the sub-list for method output_type
+	4,  // [4:9] is the sub-list for method input_type
+	4,  // [4:4] is the sub-list for extension type_name
+	4,  // [4:4] is the sub-list for extension extendee
+	0,  // [0:4] is the sub-list for field type_name
 }
 
 func init() { file_checkout_proto_init() }
@@ -284,7 +337,7 @@ func file_checkout_proto_init() {
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
 			RawDescriptor: unsafe.Slice(unsafe.StringData(file_checkout_proto_rawDesc), len(file_checkout_proto_rawDesc)),
 			NumEnums:      0,
-			NumMessages:   3,
+			NumMessages:   4,
 			NumExtensions: 0,
 			NumServices:   1,
 		},

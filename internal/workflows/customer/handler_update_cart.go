@@ -68,14 +68,11 @@ func (w *Workflow) UpdateCart(ctx workflow.Context, request *temporal.UpdateCart
 		}
 	}
 
-	//workflowcheck:ignore
-	{
-		fmt.Println("!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!1")
-		fmt.Println("workflow ID:", workflow.GetInfo(ctx).WorkflowExecution.ID)
-		fmt.Println("workflow instance ID:", workflow.GetInfo(ctx).WorkflowExecution.RunID)
-		fmt.Println("workflow instance method ID:", workflow.GetCurrentUpdateInfo(ctx).ID)
-		fmt.Println()
-	}
+	fmt.Println("!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!1")
+	fmt.Println("workflow ID:", workflow.GetInfo(ctx).WorkflowExecution.ID)
+	fmt.Println("workflow instance ID:", workflow.GetInfo(ctx).WorkflowExecution.RunID)
+	fmt.Println("workflow instance method ID:", workflow.GetCurrentUpdateInfo(ctx).ID)
+	fmt.Println()
 
 	return w.cart, nil
 }

@@ -1,0 +1,3 @@
+decls:
+  fmt.Printf: false
+  fmt.Println: false
