@@ -2,9 +2,7 @@ package main
 
 import (
 	"log"
-	"os"
 
-	"github.com/urfave/cli/v2"
 	"go.temporal.io/sdk/client"
 	"go.temporal.io/sdk/worker"
 
@@ -22,40 +20,79 @@ import (
 )
 
 func main() {
-	app, err := temporal.NewCustomerCli(
-		temporal.NewCustomerCliOptions().WithWorker(func(cmd *cli.Context, c client.Client) (worker.Worker, error) {
-			w := worker.New(c, temporal.CustomerTaskQueue, worker.Options{})
-			w.RegisterActivity(actions.HelloActivity)
-			w.RegisterActivity(actions.ByeActivity)
-			temporal.RegisterCustomerFlowWorkflow(w, customer.Register)
-			temporal.RegisterCheckoutFlowWorkflow(w, checkout.Register)
-			temporal.RegisterProcessingFlowWorkflow(w, processing.Register)
-			temporal.RegisterCustomerActivities(w,
-				ca.Register(
-					assortment.New(),
-				),
-			)
-			temporal.RegisterCheckoutActivities(w,
-				ch.Register(
-					assortment.New(),
-					payment.New(),
-				),
-			)
-			temporal.RegisterProcessingActivities(w,
-				activities.Register(
-					payment.New(),
-					vendors.New(),
-				),
-			)
-			return w, nil
-		}),
-	)
+	// The client and worker are heavyweight objects that should be created once per process.
+	c, err := client.Dial(client.Options{})
 	if err != nil {
-		log.Fatalf("error initializing example cli: %v", err)
+		log.Fatalln("Unable to create client", err)
 	}
+	defer c.Close()
 
-	// run cli
-	if err := app.Run(os.Args); err != nil {
-		log.Fatal(err)
+	w := worker.New(c, temporal.CustomerTaskQueue, worker.Options{})
+	w.RegisterActivity(actions.HelloActivity)
+	w.RegisterActivity(actions.ByeActivity)
+	temporal.RegisterCustomerFlowWorkflow(w, customer.Register)
+	temporal.RegisterCheckoutFlowWorkflow(w, checkout.Register)
+	temporal.RegisterProcessingFlowWorkflow(w, processing.Register)
+	temporal.RegisterCustomerActivities(w,
+		ca.Register(
+			assortment.New(),
+		),
+	)
+	temporal.RegisterCheckoutActivities(w,
+		ch.Register(
+			assortment.New(),
+			payment.New(),
+		),
+	)
+	temporal.RegisterProcessingActivities(w,
+		activities.Register(
+			payment.New(),
+			vendors.New(),
+		),
+	)
+
+	err = w.Run(worker.InterruptCh())
+	// err = w.Start()
+	if err != nil {
+		log.Fatalln("Unable to start worker", err)
 	}
 }
+
+// func main() {
+// 	app, err := temporal.NewCustomerCli(
+// 		temporal.NewCustomerCliOptions().WithWorker(func(cmd *cli.Context, c client.Client) (worker.Worker, error) {
+// 			w := worker.New(c, temporal.CustomerTaskQueue, worker.Options{})
+// 			w.RegisterActivity(actions.HelloActivity)
+// 			w.RegisterActivity(actions.ByeActivity)
+// 			temporal.RegisterCustomerFlowWorkflow(w, customer.Register)
+// 			temporal.RegisterCheckoutFlowWorkflow(w, checkout.Register)
+// 			temporal.RegisterProcessingFlowWorkflow(w, processing.Register)
+// 			temporal.RegisterCustomerActivities(w,
+// 				ca.Register(
+// 					assortment.New(),
+// 				),
+// 			)
+// 			temporal.RegisterCheckoutActivities(w,
+// 				ch.Register(
+// 					assortment.New(),
+// 					payment.New(),
+// 				),
+// 			)
+// 			temporal.RegisterProcessingActivities(w,
+// 				activities.Register(
+// 					payment.New(),
+// 					vendors.New(),
+// 				),
+// 			)
+// 			return w, nil
+// 		}),
+// 	)
+// 	if err != nil {
+// 		log.Fatalf("error initializing example cli: %v", err)
+// 	}
+//
+// 	// run cli
+// 	if err := app.Run(os.Args); err != nil {
+// 		log.Fatal(err)
+// 	}
+// }
