@@ -4,7 +4,7 @@ go 1.23.2
 
 require (
 	gitlab.tn.ru/golang/app v1.5.50
-	go.temporal.io/sdk v1.33.0
+	go.temporal.io/sdk v1.33.1
 )
 
 require (
