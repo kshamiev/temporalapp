@@ -22,6 +22,11 @@ func main() {
 		log.Fatalf("workflow error: %s", err)
 	}})
 
+	// c.QueryWorkflow()
+	// c.ExecuteWorkflow()
+	// c.UpdateWorkflow()
+	// c.SignalWorkflow()
+
 	w.RegisterWorkflow(listworkflow.WorkflowOne)
 	w.RegisterWorkflow(listworkflow.WorkflowTwo)
 	w.RegisterActivity(listworkflow.HelloActivity)
