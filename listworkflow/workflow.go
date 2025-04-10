@@ -11,7 +11,7 @@ import (
 )
 
 func FactorySample(ctx workflow.Context, in *SampleFlowWorkflowInput) (SampleFlowWorkflow, error) {
-	fmt.Println("FactorySample")
+	fmt.Println("FactorySample", workflow.GetInfo(ctx).WorkflowExecution.ID, workflow.GetInfo(ctx).WorkflowExecution.RunID)
 	return &Sample{
 		Req: &Profile{
 			Id:    WorkflowID(ctx),
@@ -28,7 +28,7 @@ type Sample struct {
 }
 
 func (w *Sample) Execute(ctx workflow.Context) error {
-	fmt.Println("EXECUTE")
+	fmt.Println("EXECUTE", workflow.GetInfo(ctx).WorkflowExecution.ID, workflow.GetInfo(ctx).WorkflowExecution.RunID)
 
 	// Создаем логер
 	logger := workflow.GetLogger(ctx)

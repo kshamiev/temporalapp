@@ -49,6 +49,11 @@ func main() {
 		log.Fatalln("Unable to execute workflow", err)
 	}
 
+	fmt.Println()
+	fmt.Println()
+	fmt.Println()
+	fmt.Println()
+
 	// STEP 1 CREATE
 	workflowOptions = client.StartWorkflowOptions{
 		ID:        "sample/" + uuid.NewString(),
