@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"path"
 	"runtime"
+	"time"
 
 	"github.com/google/uuid"
 	"go.temporal.io/sdk/workflow"
@@ -28,6 +29,29 @@ type Sample struct {
 
 func (w *Sample) Execute(ctx workflow.Context) error {
 	fmt.Println("EXECUTE")
+
+	// Создаем логер
+	logger := workflow.GetLogger(ctx)
+
+	// Задаем стандартные настройки для activity
+	ctx = workflow.WithActivityOptions(ctx, workflow.ActivityOptions{StartToCloseTimeout: time.Second})
+
+	// Выполняем HelloActivity
+	var helloResult string
+	if err := workflow.ExecuteActivity(ctx, HelloActivity, "HelloActivity").Get(ctx, &helloResult); err != nil {
+		logger.Error("HelloActivity failed.", "Error", err)
+		return err
+	}
+	logger.Info("HelloActivity activity completed.", "result", helloResult)
+
+	// Выполняем ByeActivity
+	var byeResult string
+	if err := workflow.ExecuteActivity(ctx, ByeActivity, "ByeActivity").Get(ctx, &byeResult); err != nil {
+		logger.Error("ByeActivity failed.", "Error", err)
+		return err
+	}
+	logger.Info("ByeActivity activity completed.", "result", byeResult)
+
 	w.DeleteProfile.Receive(ctx)
 	return workflow.ErrCanceled
 }
