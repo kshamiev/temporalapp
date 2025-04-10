@@ -32,12 +32,12 @@ temporal-dev-server:
 .PHONY: temporal-dev-server
 
 worker:
-	sleep 1
+	sleep 3
 	go run worker/main.go
 .PHONY: worker
 
 server:
-	sleep 1
+	sleep 3
 	go run starter/main.go
 .PHONY: server
 
