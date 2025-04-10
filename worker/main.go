@@ -3,7 +3,6 @@ package main
 import (
 	"log"
 
-	"gitlab.tn.ru/golang/app"
 	"go.temporal.io/sdk/client"
 	"go.temporal.io/sdk/worker"
 
@@ -32,10 +31,8 @@ func main() {
 	w.RegisterActivity(listworkflow.HelloActivity)
 	w.RegisterActivity(listworkflow.ByeActivity)
 
-	// err = w.Run(worker.InterruptCh())
-	err = w.Start()
+	err = w.Run(worker.InterruptCh())
 	if err != nil {
 		log.Fatalln("Unable to start worker", err)
 	}
-	app.Lock(nil)
 }
