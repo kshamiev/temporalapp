@@ -65,11 +65,16 @@ func main() {
 
 	// STEP 2 UPDATE
 	handle, err := c.UpdateWorkflow(context.Background(), client.UpdateWorkflowOptions{
-		UpdateID:            "",
-		WorkflowID:          run.GetID(),
-		RunID:               run.GetRunID(),
-		UpdateName:          listworkflow.UpdateProfileUpdateName,
-		Args:                []any{&listworkflow.Profile{}},
+		UpdateID:   "",
+		WorkflowID: run.GetID(),
+		RunID:      run.GetRunID(),
+		UpdateName: listworkflow.UpdateProfileUpdateName,
+		Args: []any{&listworkflow.Profile{
+			Id:      "11111111",
+			Name:    "Vasiliy Pupkin",
+			Phone:   "2222222",
+			Address: "Деревня гадюкино",
+		}},
 		WaitForStage:        client.WorkflowUpdateStageCompleted,
 		FirstExecutionRunID: "",
 	})
@@ -89,6 +94,17 @@ func main() {
 	fmt.Println("STEP 3 GET", resp)
 
 	// STEP 4 DELETE
+	signal := &listworkflow.Profile{
+		Id:      "99999999",
+		Name:    "Хаджа Нассредин",
+		Phone:   "44444444444",
+		Address: "Село хрюкино",
+	}
+	err = c.SignalWorkflow(context.Background(), run.GetID(), run.GetRunID(), listworkflow.DeleteProfileSignalName, signal)
+	if err != nil {
+		log.Fatalln(err)
+	}
+	fmt.Println("STEP 4 DELETE")
 
 	log.Println("Workflows completed")
 }
