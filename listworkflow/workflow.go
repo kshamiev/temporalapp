@@ -26,13 +26,10 @@ type Sample struct {
 	DeleteProfile *DeleteProfileSignal
 }
 
-func (w *Sample) Execute(ctx workflow.Context) (*FlowResponse, error) {
+func (w *Sample) Execute(ctx workflow.Context) error {
 	fmt.Println("EXECUTE")
 	w.DeleteProfile.Receive(ctx)
-	return &FlowResponse{
-		Id:    23,
-		Price: 67.87,
-	}, workflow.ErrCanceled
+	return workflow.ErrCanceled
 }
 
 func (w *Sample) GetProfile() (*Profile, error) {

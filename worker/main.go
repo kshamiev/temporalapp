@@ -5,6 +5,7 @@ import (
 
 	"go.temporal.io/sdk/client"
 	"go.temporal.io/sdk/worker"
+	"go.temporal.io/sdk/workflow"
 
 	"temporalapp/listworkflow"
 )
@@ -21,15 +22,12 @@ func main() {
 		log.Fatalf("workflow error: %s", err)
 	}})
 
-	// c.QueryWorkflow()
-	// c.ExecuteWorkflow()
-	// c.UpdateWorkflow()
-	// c.SignalWorkflow()
-
 	w.RegisterWorkflow(listworkflow.WorkflowOne)
 	w.RegisterWorkflow(listworkflow.WorkflowTwo)
 	w.RegisterActivity(listworkflow.HelloActivity)
 	w.RegisterActivity(listworkflow.ByeActivity)
+
+	w.RegisterWorkflowWithOptions(listworkflow.BuildSampleFlow(listworkflow.FactorySample), workflow.RegisterOptions{Name: listworkflow.SampleFlowWorkflowName})
 
 	err = w.Run(worker.InterruptCh())
 	if err != nil {

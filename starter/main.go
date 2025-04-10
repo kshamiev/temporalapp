@@ -2,12 +2,19 @@ package main
 
 import (
 	"context"
+	"fmt"
 	"log"
 
+	"github.com/google/uuid"
 	"go.temporal.io/sdk/client"
 
 	"temporalapp/listworkflow"
 )
+
+// c.QueryWorkflow()
+// c.ExecuteWorkflow()
+// c.UpdateWorkflow()
+// c.SignalWorkflow()
 
 func main() {
 	// The client is a heavyweight object that should be created once per process.
@@ -41,6 +48,47 @@ func main() {
 	if err != nil {
 		log.Fatalln("Unable to execute workflow", err)
 	}
+
+	// STEP 1 CREATE
+	workflowOptions = client.StartWorkflowOptions{
+		ID:        "sample/" + uuid.NewString(),
+		TaskQueue: "hello",
+	}
+	run, err := c.ExecuteWorkflow(context.Background(), workflowOptions, listworkflow.SampleFlowWorkflowName, &listworkflow.FlowRequest{Name: "pusik"})
+	if err != nil {
+		log.Fatalln(err)
+	}
+	if run == nil {
+		log.Fatalln("execute workflow returned nil run")
+	}
+	fmt.Println("STEP 1 CREATE", "WorkflowID", run.GetID(), "RunID", run.GetRunID())
+
+	// STEP 2 UPDATE
+	handle, err := c.UpdateWorkflow(context.Background(), client.UpdateWorkflowOptions{
+		UpdateID:            "",
+		WorkflowID:          run.GetID(),
+		RunID:               run.GetRunID(),
+		UpdateName:          listworkflow.UpdateProfileUpdateName,
+		Args:                []any{&listworkflow.Profile{}},
+		WaitForStage:        client.WorkflowUpdateStageCompleted,
+		FirstExecutionRunID: "",
+	})
+	if err != nil {
+		log.Fatalln(err)
+	}
+	var resp listworkflow.Profile
+	err = handle.Get(context.Background(), &resp)
+	fmt.Println("STEP 2 UPDATE", resp)
+
+	// STEP 3 GET
+	if val, err := c.QueryWorkflow(context.Background(), run.GetID(), run.GetRunID(), listworkflow.GetProfileQueryName); err != nil {
+		log.Fatalln(err)
+	} else if err = val.Get(&resp); err != nil {
+		log.Fatalln(err)
+	}
+	fmt.Println("STEP 3 GET", resp)
+
+	// STEP 4 DELETE
 
 	log.Println("Workflows completed")
 }

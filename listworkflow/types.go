@@ -3,12 +3,16 @@ package listworkflow
 import (
 	"time"
 
+	"github.com/cludden/protoc-gen-go-temporal/pkg/expression"
 	"go.temporal.io/sdk/workflow"
 )
 
+// Это основной workflow
+//
+// workflow details: (name: "pbworkflow.Sample.SampleFlow", id: "sample/${! sampleId.or(id.or(uuid_v4())) }")
 type SampleFlowWorkflow interface {
 	// Execute defines the entrypoint to a(n) pbworkflow.Sample.SampleFlow workflow
-	Execute(ctx workflow.Context) (*FlowResponse, error)
+	Execute(ctx workflow.Context) error
 
 	// Получение профиля из запущенного workflow
 	// https://docs.temporal.io/encyclopedia/workflow-message-passing#writing-query-handlers
@@ -18,6 +22,8 @@ type SampleFlowWorkflow interface {
 	// https://docs.temporal.io/encyclopedia/workflow-message-passing#writing-query-handlers
 	UpdateProfile(workflow.Context, *Profile) (*Profile, error)
 }
+
+//
 
 type SampleFlowWorkflowInput struct {
 	Req           *FlowRequest
@@ -43,10 +49,35 @@ type Profile struct {
 
 // ////
 
+// SampleTaskQueue is the default task-queue for a pbworkflow.Sample worker
+const SampleTaskQueue = "general"
+
+// pbworkflow.Sample workflow names
+const (
+	SampleFlowWorkflowName = "pbworkflow.Sample.SampleFlow"
+)
+
+// pbworkflow.Sample workflow id expressions
+var (
+	SampleFlowIdexpression = expression.MustParseExpression("sample/${! sampleId.or(id.or(uuid_v4())) }")
+)
+
+// pbworkflow.Sample query names
+const (
+	GetProfileQueryName = "pbworkflow.Sample.GetProfile"
+)
+
 // pbworkflow.Sample signal names
 const (
 	DeleteProfileSignalName = "pbworkflow.Sample.DeleteProfile"
 )
+
+// pbworkflow.Sample update names
+const (
+	UpdateProfileUpdateName = "pbworkflow.Sample.UpdateProfile"
+)
+
+// ////
 
 // DeleteProfileSignal describes a(n) pbworkflow.Sample.DeleteProfile signal
 type DeleteProfileSignal struct {
