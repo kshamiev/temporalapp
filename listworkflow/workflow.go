@@ -6,7 +6,6 @@ import (
 	"runtime"
 	"time"
 
-	"github.com/google/uuid"
 	"go.temporal.io/sdk/workflow"
 )
 
@@ -61,20 +60,21 @@ func (w *Sample) GetProfile() (*Profile, error) {
 }
 
 func (w *Sample) UpdateProfile(ctx workflow.Context, in *Profile) (*Profile, error) {
+	w.Req.Id = in.Id
 	w.Req.Name = in.Name
 	w.Req.Phone = in.Phone
 
 	// Изменение с использованием версий
-	switch version(ctx, 1) {
-	case workflow.DefaultVersion: // старая версия кода
-	case 1: // новая версия кода
-		encodedValue := workflow.SideEffect(ctx, func(ctx workflow.Context) interface{} {
-			return uuid.NewString()
-		})
-		if err := encodedValue.Get(&w.Req.Address); err != nil {
-			return nil, err
-		}
-	}
+	// switch version(ctx, 1) {
+	// case workflow.DefaultVersion: // старая версия кода
+	// case 1: // новая версия кода
+	// 	encodedValue := workflow.SideEffect(ctx, func(ctx workflow.Context) interface{} {
+	// 		return uuid.NewString()
+	// 	})
+	// 	if err := encodedValue.Get(&w.Req.Address); err != nil {
+	// 		return nil, err
+	// 	}
+	// }
 
 	fmt.Println("!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!")
 	fmt.Println("workflow ID:", workflow.GetInfo(ctx).WorkflowExecution.ID)
