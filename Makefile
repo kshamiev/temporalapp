@@ -22,7 +22,7 @@ gen-temporal:
      --go_temporal_opt="cli-categories=true" \
      --go_temporal_opt="cli-enabled=true" \
      --go_temporal_opt="workflow-update-enabled=true" \
-     proto/common.proto proto/processing.proto proto/customer.proto proto/checkout.proto
+     proto/common.proto proto/processing.proto proto/customer.proto proto/checkout.proto proto/sample.proto
 .PHONY: gen-temporal
 
 gen-server:

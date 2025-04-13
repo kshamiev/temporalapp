@@ -1,0 +1,24 @@
+syntax = "proto3";
+
+package temporal;
+
+import "google/protobuf/empty.proto";
+import "temporal/v1/temporal.proto";
+
+option go_package = "temporalapp/internal/generated/temporal";
+
+service Sample {
+  // Очередь задач
+  // https://docs.temporal.io/workers#task-queue
+  option (temporal.v1.service) = {
+    task_queue: "general"
+  };
+
+  // Это основной workflow, представляющий жизненный цикл пользователя
+  rpc Create(google.protobuf.Empty) returns (google.protobuf.Empty) {
+    option (temporal.v1.workflow) = {
+      id_reuse_policy: WORKFLOW_ID_REUSE_POLICY_ALLOW_DUPLICATE
+      id: 'sample/${! customerId.or(id.or(uuid_v4())) }'
+    };
+  }
+}
