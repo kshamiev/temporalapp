@@ -37,7 +37,7 @@ temporal-dev-server:
 	temporal server start-dev \
       --dynamic-config-value "frontend.enableUpdateWorkflowExecution=true" \
       --dynamic-config-value "frontend.enableUpdateWorkflowExecutionAsyncAccepted=true" \
-      --ui-port 8080
+      --ui-port 9090
 .PHONY: temporal-dev-server
 
 worker:
